@@ -5,3 +5,4 @@ authors = ["Nick Cameron <nrc@ncameron.org>"]
 edition = "2018"
 
 [dependencies]
+derive-new = "0.5"

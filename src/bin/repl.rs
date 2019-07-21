@@ -1,3 +1,7 @@
+use clyde::{Repl, ReplConfig};
+
 fn main() {
-    println!("Hello, world!");
+    let config = ReplConfig::default();
+    let repl = Repl::new(config);
+    repl.run();
 }
