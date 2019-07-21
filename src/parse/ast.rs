@@ -3,6 +3,13 @@ use derive_new::new;
 
 pub trait Node {}
 
+pub struct Program {
+    pub stmts: Vec<Statement>,
+    pub ctx: Context,
+}
+
+impl Node for Program {}
+
 pub struct Statement {
     pub kind: StatementKind,
     pub ctx: Context,
@@ -93,4 +100,44 @@ impl Node for Identifier {}
 pub enum Multiplicity {
     Many,
     One,
+}
+
+#[cfg(test)]
+pub mod builder {
+    use super::*;
+
+    pub fn ctx() -> Context {
+        Context::default()
+    }
+
+    pub fn ident(s: &str) -> Identifier {
+        Identifier {
+            name: s.to_owned(),
+            ctx: ctx(),
+        }
+    }
+
+    pub fn show(e: Expr) -> Statement {
+        Statement {
+            kind: StatementKind::Show(Show {
+                expr: Box::new(e),
+                ctx: ctx(),
+            }),
+            ctx: ctx(),
+        }
+    }
+
+    pub fn void() -> Expr {
+        Expr {
+            kind: ExprKind::Void,
+            ctx: ctx(),
+        }
+    }
+
+    pub fn meta_stmt(mk: MetaKind) -> Statement {
+        Statement {
+            kind: StatementKind::Meta(mk),
+            ctx: ctx(),
+        }
+    }
 }

@@ -1,18 +1,23 @@
 use super::Environment;
-use crate::parse;
+use crate::file_system::PhysicalFs;
+use crate::front;
+use crate::parse::{self, ast};
 use std::cell::Cell;
 use std::env;
 use std::io::{stdin, stdout, Write};
 use std::path::PathBuf;
+use std::process;
 
 pub struct Repl {
     config: Config,
     line_count: Cell<usize>,
+    file_system: PhysicalFs,
 }
 
 impl Repl {
     pub fn new(config: Config) -> Repl {
         Repl {
+            file_system: PhysicalFs::new(&config.current_dir),
             config,
             line_count: Cell::new(0),
         }
@@ -30,7 +35,9 @@ impl Repl {
             match parse::parse_stmt(&buf, None) {
                 Ok(node) => {
                     self.incr_line_count();
-                    // TODO execute node
+                    let mut interpreter = front::Interpreter::new(self);
+                    // TODO errors
+                    interpreter.interpret(node).unwrap();
                 }
                 Err(e) => match e {
                     parse::Error::EmptyInput => {}
@@ -62,6 +69,44 @@ impl Repl {
 
 impl Environment for Repl {
     type ParseContext = ReplParseContext;
+    type Fs = PhysicalFs;
+
+    fn exec_meta(&self, mk: ast::MetaKind) -> Result<(), front::Error> {
+        match mk {
+            ast::MetaKind::Exit => process::exit(0),
+            ast::MetaKind::Help => {
+                println!("Clyde 0.1");
+                println!("");
+                println!("Meta-commands:");
+                println!("  ^help     display this message");
+                println!("  ^exit     exit Clyde");
+                println!("");
+                println!("Some common statements:");
+                println!("  select    query the program");
+                println!("  x =       variable assignment");
+                println!("  show      print a value");
+            }
+        }
+
+        Ok(())
+    }
+
+    fn show(&self, s: &str) -> Result<(), front::Error> {
+        println!("{}", s);
+        Ok(())
+    }
+
+    fn lookup_var(&self, var: &front::MetaVar) -> Result<front::Value, front::Error> {
+        // FIXME lookup variable by name
+        Err(front::Error::VarNotFound(var.clone()))
+    }
+    fn lookup_numeric_var(&self, id: isize) -> Result<front::Value, front::Error> {
+        unimplemented!();
+    }
+
+    fn file_system(&self) -> &PhysicalFs {
+        &self.file_system
+    }
 }
 
 pub struct Config {

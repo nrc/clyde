@@ -35,11 +35,16 @@ impl Parser {
                     self.bump();
                     ast::StatementKind::Expr(ast::ExprKind::MetaVar(ast::MetaVarKind::Dollar))
                 }
+                tokens::SymbolKind::Caret => {
+                    self.bump();
+                    ast::StatementKind::Meta(self.meta()?)
+                }
                 _ => return Err(self.make_err(format!("Expected statement, found `{}`", sym))),
             },
+            // TODO try and parse an expression, e.g., (...)
             _ => return Err(self.make_err("Expected statement, TODO found what?".to_owned())),
         };
-        self.maybe_semi();
+        self.maybe_semi()?;
 
         Ok(ast::Statement {
             kind,
@@ -154,6 +159,21 @@ impl Parser {
 
         let next = next.to_string();
         Err(self.make_err(format!("Expected identifier, found `{}`", next)))
+    }
+
+    fn meta(&mut self) -> Result<ast::MetaKind, Error> {
+        let next = self.next()?;
+        match next.kind {
+            tokens::TokenKind::Ident => match &*next.span.text {
+                "exit" | "q" => return Ok(ast::MetaKind::Exit),
+                "help" | "h" => return Ok(ast::MetaKind::Help),
+                _ => {}
+            },
+            _ => {}
+        }
+
+        let next = next.to_string();
+        Err(self.make_err(format!("Expected meta-command, found `{}`", next)))
     }
 
     fn maybe_semi(&mut self) -> Result<(), Error> {
