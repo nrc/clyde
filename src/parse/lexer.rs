@@ -69,6 +69,7 @@ impl<'a> Lexer<'a> {
             '=' => Ok(Some((self.make_symbol(SymbolKind::Eq), 1))),
             '#' => Ok(Some((self.make_symbol(SymbolKind::Hash), 1))),
             ';' => Ok(Some((self.make_symbol(SymbolKind::SemiColon), 1))),
+            // `->`
             '-' => match chars.next() {
                 None => Err(self.make_err("Unexpected end of input, expected `>`".to_owned(), 1)),
                 Some('>') => Ok(Some((
@@ -77,59 +78,76 @@ impl<'a> Lexer<'a> {
                 ))),
                 Some(_) => Err(self.make_err("Unexpected token".to_owned(), 1)),
             },
-            '(' => {
-                let mut len = 1;
-                let mut delim_stack = vec![')'];
-                loop {
-                    match chars.next() {
-                        Some('(') => {
-                            len += 1;
-                            delim_stack.push(')');
-                        }
-                        Some(c) if c == *delim_stack.last().unwrap() => {
-                            len += 1;
-                            delim_stack.pop().unwrap();
-                            if delim_stack.is_empty() {
-                                break;
-                            }
-                        }
-                        Some(c) => {
-                            len += c.len_utf8();
-                        }
-                        None => {
-                            return Err(self.make_err(
-                                format!(
-                                    "Unexpected end of input (unclosed delimiters), expected `{}`",
-                                    encode_ascii(&delim_stack)
-                                ),
-                                len - 1,
-                            ))
-                        }
-                    }
-                }
-                Ok(Some((
-                    Token::new(TokenKind::RawTree, self.make_span(len)),
-                    len,
-                )))
-            }
-            c if c.is_alphabetic() => {
-                let mut len = c.len_utf8();
-                loop {
-                    match chars.next() {
-                        Some(c) if c.is_alphanumeric() => {
-                            len += c.len_utf8();
-                        }
-                        _ => break,
-                    }
-                }
-                Ok(Some((
-                    Token::new(TokenKind::Ident, self.make_span(len)),
-                    len,
-                )))
-            }
+            // A nested token tree, we don't lex this beyond matching delimiters, and
+            // store the result as a RawTree.
+            '(' => self.lex_raw_tree(),
+            c if c.is_alphabetic() => self.lex_ident(),
             c if c.is_whitespace() => Ok(None),
             _ => Err(self.make_err("Unexpected token".to_owned(), 0)),
         }
+    }
+
+    // Lex an identifier. If the current character is not alphanumeric, this
+    // function will return an Ident token with zero length.
+    fn lex_ident(&self) -> Result<Option<(Token, usize)>, parse::Error> {
+        let mut chars = self.input[self.position..].chars();
+        let mut len = 0;
+        loop {
+            match chars.next() {
+                Some(c) if c.is_alphanumeric() => {
+                    len += c.len_utf8();
+                }
+                _ => break,
+            }
+        }
+        Ok(Some((
+            Token::new(TokenKind::Ident, self.make_span(len)),
+            len,
+        )))
+    }
+
+    // Lex a raw tree from the input. This will lex until either the input is
+    // empty or until opening delimiters are closed. Note that if there are no
+    // opening delimiters, then this function will succeed but produce an odd
+    // token which might break invariants elsewhere.
+    fn lex_raw_tree(&self) -> Result<Option<(Token, usize)>, parse::Error> {
+        let mut chars = self.input[self.position..].chars();
+        let mut len = 0;
+        let mut delim_stack = Vec::new();
+        loop {
+            match chars.next() {
+                Some('(') => {
+                    len += 1;
+                    delim_stack.push(')');
+                }
+                Some(c) if c == *delim_stack.last().unwrap() => {
+                    len += 1;
+                    delim_stack.pop().unwrap();
+                    if delim_stack.is_empty() {
+                        break;
+                    }
+                }
+                Some(c) => {
+                    len += c.len_utf8();
+                }
+                None if delim_stack.is_empty() => {
+                    break;
+                }
+                None => {
+                    return Err(self.make_err(
+                        format!(
+                            "Unexpected end of input (unclosed delimiters), expected `{}`",
+                            encode_ascii(&delim_stack)
+                        ),
+                        len - 1,
+                    ))
+                }
+            }
+        }
+        Ok(Some((
+            Token::new(TokenKind::RawTree, self.make_span(len)),
+            len,
+        )))
     }
 
     fn make_err(&self, msg: String, offset: usize) -> parse::Error {
