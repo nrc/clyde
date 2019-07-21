@@ -30,13 +30,17 @@ impl Repl {
             match parse::parse_stmt(&buf, None) {
                 Ok(node) => {
                     self.incr_line_count();
-                    // TODO execute stmt
+                    // TODO execute node
                 }
                 Err(e) => match e {
                     parse::Error::EmptyInput => {}
                     parse::Error::Lexing(msg, offset) => {
                         let offset = offset + prompt.len();
                         println!("{}^", " ".repeat(offset));
+                        println!("{}", msg);
+                        self.incr_line_count();
+                    }
+                    parse::Error::Parsing(msg) => {
                         println!("{}", msg);
                         self.incr_line_count();
                     }
@@ -77,4 +81,8 @@ pub struct ReplParseContext {
     line_number: usize,
 }
 
-impl parse::EnvContext for ReplParseContext {}
+impl parse::EnvContext for ReplParseContext {
+    fn clone(&self) -> Box<dyn parse::EnvContext> {
+        Box::new(Clone::clone(self))
+    }
+}
