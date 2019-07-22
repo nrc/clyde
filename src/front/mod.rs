@@ -168,12 +168,12 @@ impl fmt::Display for ValueKind {
                     write!(f, "[")?;
                     let mut first = true;
                     for v in v {
-                        write!(f, "{}", v)?;
                         if first {
                             first = false;
                         } else {
                             write!(f, ", ")?;
                         }
+                        write!(f, "{}", v)?;
                     }
                     write!(f, "]")
                 } else {
@@ -286,7 +286,25 @@ mod test {
     #[test]
     fn test_value_display() {
         assert_eq!(Value::void().to_string(), "()");
-
-        // TODO value.display
+        assert_eq!(Value::number(42).to_string(), "42");
+        let set = Value {
+            kind: ValueKind::Set(vec![Value::number(1), Value::number(2), Value::number(3)]),
+            ty: Type::Set(Box::new(Type::Number)),
+        };
+        assert_eq!(set.to_string(), "[1, 2, 3]");
+        let set = Value {
+            kind: ValueKind::Set(vec![
+                Value::number(1),
+                Value::number(2),
+                Value::number(3),
+                Value::number(3),
+                Value::number(3),
+                Value::number(3),
+                Value::number(3),
+                Value::number(3),
+            ]),
+            ty: Type::Set(Box::new(Type::Number)),
+        };
+        assert_eq!(set.to_string(), "[...]*8");
     }
 }
