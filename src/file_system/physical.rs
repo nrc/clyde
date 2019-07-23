@@ -1,6 +1,6 @@
 use crate::file_system::{self, File, FileSystem, Path, SearchPattern};
 use crate::front;
-use crate::parse::ast;
+use crate::ast;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;

@@ -1,6 +1,6 @@
 use crate::front;
 use crate::front::data::{Position, Range};
-use crate::parse::ast;
+use crate::ast;
 use std::fmt;
 use std::io;
 
@@ -102,12 +102,12 @@ fn resolve_location<Fs: FileSystem>(loc: ast::Location, fs: &Fs) -> Result<front
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::parse::ast::builder;
+    use crate::ast::builder;
 
     pub struct MockFs;
 
     impl FileSystem for MockFs {
-        fn with_file<F, T>(&self, path: Path, f: F) -> Result<T, Error>
+        fn with_file<F, T>(&self, path: Path, _: F) -> Result<T, Error>
         where
             F: FnOnce(&File) -> T,
         {

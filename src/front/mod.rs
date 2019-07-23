@@ -1,7 +1,7 @@
-use self::data::{Position, Range};
+pub use self::data::{Locator, MetaVar, Value};
 use crate::env::Environment;
 use crate::file_system::{self, FileSystem};
-use crate::parse::ast;
+use crate::ast;
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
@@ -109,120 +109,6 @@ impl<T: fmt::Display> Show for T {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct MetaVar {
-    name: String,
-}
-
-impl MetaVar {
-    fn new(name: &str) -> MetaVar {
-        MetaVar {
-            name: name.to_owned(),
-        }
-    }
-}
-
-impl fmt::Display for MetaVar {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.name.fmt(f)
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Value {
-    ty: Type,
-    kind: ValueKind,
-}
-
-impl Show for Value {
-    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> io::Result<()> {
-        self.kind.show(w, env)
-    }
-}
-
-impl Value {
-    fn void() -> Value {
-        Value {
-            ty: Type::Void,
-            kind: ValueKind::Void,
-        }
-    }
-
-    fn number(n: usize) -> Value {
-        Value {
-            ty: Type::Number,
-            kind: ValueKind::Number(n),
-        }
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub enum Type {
-    Void,
-    Number,
-    Set(Box<Type>),
-    Position,
-    Range,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ValueKind {
-    Void,
-    Number(usize),
-    Set(Vec<Value>),
-    Position(Position),
-    Range(Range),
-}
-
-impl Show for ValueKind {
-    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> io::Result<()> {
-        match self {
-            ValueKind::Void => write!(w, "()"),
-            ValueKind::Number(n) => write!(w, "{}", n),
-            ValueKind::Set(v) => {
-                if v.len() < 5 {
-                    write!(w, "[")?;
-                    let mut first = true;
-                    for v in v {
-                        if first {
-                            first = false;
-                        } else {
-                            write!(w, ", ")?;
-                        }
-                        v.show(w, env)?;
-                    }
-                    write!(w, "]")
-                } else {
-                    write!(w, "[...]*{}", v.len())
-                }
-            }
-            ValueKind::Position(_) => write!(w, "TODO"),
-            ValueKind::Range(_) => write!(w, "TODO"),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Locator {
-    Position(Position),
-    Range(Range),
-}
-
-impl From<Locator> for Value {
-    fn from(loc: Locator) -> Value {
-        match loc {
-            Locator::Position(p) => Value {
-                ty: Type::Position,
-                kind: ValueKind::Position(p),
-            },
-            Locator::Range(r) => Value {
-                ty: Type::Range,
-                kind: ValueKind::Range(r),
-            },
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum Error {
     VarNotFound(MetaVar),
@@ -246,9 +132,10 @@ impl fmt::Display for Error {
 
 #[cfg(test)]
 mod test {
+    use super::data::ValueKind;
     use super::*;
     use crate::env::mock::MockEnv;
-    use crate::parse::ast::builder;
+    use crate::ast::builder;
 
     fn assert_err<T: fmt::Debug>(e: Result<T, Error>, s: &str) {
         if let Err(Error::Other(msg)) = &e {
@@ -307,29 +194,4 @@ mod test {
     // TODO test locations
     #[test]
     fn test_location() {}
-
-    #[test]
-    fn test_value_display() {
-        assert_eq!(Value::void().to_string(&MockEnv), "()");
-        assert_eq!(Value::number(42).to_string(&MockEnv), "42");
-        let set = Value {
-            kind: ValueKind::Set(vec![Value::number(1), Value::number(2), Value::number(3)]),
-            ty: Type::Set(Box::new(Type::Number)),
-        };
-        assert_eq!(set.to_string(&MockEnv), "[1, 2, 3]");
-        let set = Value {
-            kind: ValueKind::Set(vec![
-                Value::number(1),
-                Value::number(2),
-                Value::number(3),
-                Value::number(3),
-                Value::number(3),
-                Value::number(3),
-                Value::number(3),
-                Value::number(3),
-            ]),
-            ty: Type::Set(Box::new(Type::Number)),
-        };
-        assert_eq!(set.to_string(&MockEnv), "[...]*8");
-    }
 }
