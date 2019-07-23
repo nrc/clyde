@@ -1,6 +1,6 @@
 use super::Environment;
 use crate::file_system::PhysicalFs;
-use crate::front;
+use crate::front::{self, Show};
 use crate::parse::{self, ast};
 use std::cell::Cell;
 use std::env;
@@ -92,8 +92,8 @@ impl Environment for Repl {
         Ok(())
     }
 
-    fn show(&self, s: &str) -> Result<(), front::Error> {
-        println!("{}", s);
+    fn show(&self, s: &impl Show) -> Result<(), front::Error> {
+        println!("{}", s.to_string(self));
         Ok(())
     }
 

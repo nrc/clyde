@@ -4,6 +4,7 @@ use crate::file_system::{self, FileSystem};
 use crate::parse::ast;
 use std::collections::HashMap;
 use std::fmt;
+use std::io::{self, Write};
 
 pub mod data;
 
@@ -32,11 +33,11 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
         match stmt.kind {
             ast::StatementKind::Expr(expr) => {
                 let value = self.interpret_expr(expr)?;
-                self.env.show(&value.to_string())
+                self.env.show(&value)
             }
             ast::StatementKind::Show(sh) => {
                 let value = self.interpret_expr(sh.expr.kind)?;
-                self.env.show(&value.to_string())
+                self.env.show(&value)
             }
             ast::StatementKind::Meta(mk) => self.env.exec_meta(mk),
         }
@@ -93,6 +94,21 @@ impl Default for SymbolTable {
     }
 }
 
+pub trait Show {
+    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> io::Result<()>;
+    fn to_string(&self, env: &impl Environment) -> String {
+        let mut buf: Vec<u8> = Vec::new();
+        self.show(&mut buf, env).unwrap();
+        String::from_utf8(buf).unwrap()
+    }
+}
+
+impl<T: fmt::Display> Show for T {
+    fn show(&self, w: &mut dyn Write, _: &impl Environment) -> io::Result<()> {
+        write!(w, "{}", self).into()
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct MetaVar {
     name: String,
@@ -118,9 +134,9 @@ pub struct Value {
     kind: ValueKind,
 }
 
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.kind.fmt(f)
+impl Show for Value {
+    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> io::Result<()> {
+        self.kind.show(w, env)
     }
 }
 
@@ -158,30 +174,30 @@ pub enum ValueKind {
     Range(Range),
 }
 
-impl fmt::Display for ValueKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Show for ValueKind {
+    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> io::Result<()> {
         match self {
-            ValueKind::Void => write!(f, "()"),
-            ValueKind::Number(n) => write!(f, "{}", n),
+            ValueKind::Void => write!(w, "()"),
+            ValueKind::Number(n) => write!(w, "{}", n),
             ValueKind::Set(v) => {
                 if v.len() < 5 {
-                    write!(f, "[")?;
+                    write!(w, "[")?;
                     let mut first = true;
                     for v in v {
                         if first {
                             first = false;
                         } else {
-                            write!(f, ", ")?;
+                            write!(w, ", ")?;
                         }
-                        write!(f, "{}", v)?;
+                        v.show(w, env)?;
                     }
-                    write!(f, "]")
+                    write!(w, "]")
                 } else {
-                    write!(f, "[...]*{}", v.len())
+                    write!(w, "[...]*{}", v.len())
                 }
             }
-            ValueKind::Position(_) => write!(f, "TODO"),
-            ValueKind::Range(_) => write!(f, "TODO"),
+            ValueKind::Position(_) => write!(w, "TODO"),
+            ValueKind::Range(_) => write!(w, "TODO"),
         }
     }
 }
@@ -215,7 +231,7 @@ pub enum Error {
 
 impl From<file_system::Error> for Error {
     fn from(e: file_system::Error) -> Error {
-        Error::Other(e.to_string())
+        Error::Other(fmt::Display::to_string(&e))
     }
 }
 
@@ -294,13 +310,13 @@ mod test {
 
     #[test]
     fn test_value_display() {
-        assert_eq!(Value::void().to_string(), "()");
-        assert_eq!(Value::number(42).to_string(), "42");
+        assert_eq!(Value::void().to_string(&MockEnv), "()");
+        assert_eq!(Value::number(42).to_string(&MockEnv), "42");
         let set = Value {
             kind: ValueKind::Set(vec![Value::number(1), Value::number(2), Value::number(3)]),
             ty: Type::Set(Box::new(Type::Number)),
         };
-        assert_eq!(set.to_string(), "[1, 2, 3]");
+        assert_eq!(set.to_string(&MockEnv), "[1, 2, 3]");
         let set = Value {
             kind: ValueKind::Set(vec![
                 Value::number(1),
@@ -314,6 +330,6 @@ mod test {
             ]),
             ty: Type::Set(Box::new(Type::Number)),
         };
-        assert_eq!(set.to_string(), "[...]*8");
+        assert_eq!(set.to_string(&MockEnv), "[...]*8");
     }
 }

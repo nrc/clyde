@@ -1,5 +1,5 @@
 use crate::file_system::FileSystem;
-use crate::front;
+use crate::front::{self, Show};
 use crate::parse::{self, ast};
 
 pub(crate) mod repl;
@@ -9,7 +9,7 @@ pub trait Environment {
     type Fs: FileSystem;
 
     fn exec_meta(&self, mk: ast::MetaKind) -> Result<(), front::Error>;
-    fn show(&self, s: &str) -> Result<(), front::Error>;
+    fn show(&self, s: &impl Show) -> Result<(), front::Error>;
     fn lookup_var(&self, var: &front::MetaVar) -> Result<front::Value, front::Error>;
     fn lookup_numeric_var(&self, id: isize) -> Result<front::Value, front::Error>;
     fn file_system(&self) -> &Self::Fs;
@@ -33,9 +33,9 @@ pub mod mock {
             }))
         }
 
-        fn show(&self, s: &str) -> Result<(), front::Error> {
-            eprintln!("show: {}", s);
-            Err(front::Error::Other(s.to_owned()))
+        fn show(&self, s: &impl Show) -> Result<(), front::Error> {
+            eprintln!("show: {}", s.to_string(self));
+            Err(front::Error::Other(s.to_string(self)))
         }
 
         fn lookup_var(&self, _: &front::MetaVar) -> Result<front::Value, front::Error> {
