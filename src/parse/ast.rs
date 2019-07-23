@@ -140,4 +140,13 @@ pub mod builder {
             ctx: ctx(),
         }
     }
+
+    pub fn location(file: Option<String>, line: Option<usize>, column: Option<usize>) -> Location {
+        Location {
+            file,
+            line,
+            column,
+            ctx: ctx(),
+        }
+    }
 }

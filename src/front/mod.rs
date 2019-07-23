@@ -31,8 +31,8 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
     fn interpret_stmt(&mut self, stmt: ast::Statement) -> Result<(), Error> {
         match stmt.kind {
             ast::StatementKind::Expr(expr) => {
-                self.interpret_expr(expr)?;
-                Ok(())
+                let value = self.interpret_expr(expr)?;
+                self.env.show(&value.to_string())
             }
             ast::StatementKind::Show(sh) => {
                 let value = self.interpret_expr(sh.expr.kind)?;
@@ -112,7 +112,7 @@ impl fmt::Display for MetaVar {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Value {
     ty: Type,
     kind: ValueKind,
@@ -149,7 +149,7 @@ pub enum Type {
     Range,
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ValueKind {
     Void,
     Number(usize),
@@ -186,7 +186,7 @@ impl fmt::Display for ValueKind {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Locator {
     Position(Position),
     Range(Range),
@@ -219,6 +219,15 @@ impl From<file_system::Error> for Error {
     }
 }
 
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::VarNotFound(v) => write!(f, "Variable not found: `{}`", v),
+            Error::Other(s) => write!(f, "{}", s),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -238,10 +247,10 @@ mod test {
     #[test]
     fn test_void() {
         let mut interp = Interpreter::new(&MockEnv);
-        assert_eq!(
-            interp.interpret_expr(ast::ExprKind::Void).unwrap(),
-            Value::void()
-        );
+        if let ValueKind::Void = interp.interpret_expr(ast::ExprKind::Void).unwrap().kind {
+            return;
+        }
+        panic!();
     }
 
     #[test]

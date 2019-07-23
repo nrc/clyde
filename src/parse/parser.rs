@@ -24,26 +24,29 @@ impl Parser {
             Some(tok) => tok,
             None => return Err(self.make_err("Expected statement, found ``".to_owned())),
         };
-        let kind = match tok.kind {
-            tokens::TokenKind::Ident => match &*tok.span.text {
-                "select" => ast::StatementKind::Expr(ast::ExprKind::Select(self.select()?)),
-                "show" => ast::StatementKind::Show(self.show()?),
-                i => return Err(self.make_err(format!("Expected statement, found `{}`", i))),
-            },
-            tokens::TokenKind::Symbol(sym) => match sym {
-                tokens::SymbolKind::Dollar => {
-                    self.bump();
-                    ast::StatementKind::Expr(ast::ExprKind::MetaVar(ast::MetaVarKind::Dollar))
-                }
-                tokens::SymbolKind::Caret => {
-                    self.bump();
-                    ast::StatementKind::Meta(self.meta()?)
-                }
-                _ => return Err(self.make_err(format!("Expected statement, found `{}`", sym))),
-            },
-            // TODO try and parse an expression, e.g., (...)
-            _ => return Err(self.make_err("Expected statement, TODO found what?".to_owned())),
+        let stok = tok.to_string();
+
+        let mut kind = None;
+        match tok.kind {
+            tokens::TokenKind::Ident if &*tok.span.text == "show" => {
+                kind = Some(ast::StatementKind::Show(self.show()?));
+            }
+            tokens::TokenKind::Symbol(sym) if sym == tokens::SymbolKind::Caret => {
+                kind = Some(ast::StatementKind::Meta(self.meta()?));
+            }
+            _ => {}
+        }
+
+        if kind.is_none() {
+            let expr = self.maybe_expr()?;
+            kind = expr.map(|expr| ast::StatementKind::Expr(expr.kind));
+        }
+
+        let kind = match kind {
+            Some(kind) => kind,
+            None => return Err(self.make_err(format!("Expected statement, found `{}`", stok))),
         };
+
         self.maybe_semi()?;
 
         Ok(ast::Statement {
@@ -162,6 +165,7 @@ impl Parser {
     }
 
     fn meta(&mut self) -> Result<ast::MetaKind, Error> {
+        self.assert_sym(tokens::SymbolKind::Caret)?;
         let next = self.next()?;
         match next.kind {
             tokens::TokenKind::Ident => match &*next.span.text {
@@ -229,6 +233,19 @@ impl Parser {
         let next = self.next()?;
         match next.kind {
             tokens::TokenKind::Ident if next.span.text == s => {
+                return Ok(());
+            }
+            _ => {}
+        }
+
+        let next = next.to_string();
+        Err(self.make_err(format!("Expected `{}`, found `{}`", s, next)))
+    }
+
+    fn assert_sym(&mut self, s: tokens::SymbolKind) -> Result<(), Error> {
+        let next = self.next()?;
+        match next.kind {
+            tokens::TokenKind::Symbol(kind) if kind == s => {
                 return Ok(());
             }
             _ => {}

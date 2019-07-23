@@ -34,10 +34,11 @@ impl Repl {
             stdin.read_line(&mut buf).expect("Error reading from stdin");
             match parse::parse_stmt(&buf, None) {
                 Ok(node) => {
-                    self.incr_line_count();
                     let mut interpreter = front::Interpreter::new(self);
-                    // TODO errors
-                    interpreter.interpret(node).unwrap();
+                    if let Err(e) = interpreter.interpret(node) {
+                        println!("{}", e);
+                    }
+                    self.incr_line_count();
                 }
                 Err(e) => match e {
                     parse::Error::EmptyInput => {}

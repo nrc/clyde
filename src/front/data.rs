@@ -1,13 +1,13 @@
 use crate::file_system::Path;
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Position {
     pub file: Path,
     pub line: usize,
     pub column: usize,
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Range {
     File(Path),
     MultiFile(Vec<Path>),
@@ -15,7 +15,7 @@ pub enum Range {
     Span(Span),
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Span {
     pub file: Path,
     pub start_line: usize,

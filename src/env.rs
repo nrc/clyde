@@ -18,14 +18,13 @@ pub trait Environment {
 #[cfg(test)]
 pub mod mock {
     use super::*;
-    use crate::file_system::PhysicalFs;
+    use crate::file_system::MockFs;
 
     pub struct MockEnv;
 
     impl Environment for MockEnv {
         type ParseContext = ();
-        // TODO MockFs
-        type Fs = PhysicalFs;
+        type Fs = MockFs;
 
         fn exec_meta(&self, mk: ast::MetaKind) -> Result<(), front::Error> {
             Err(front::Error::Other(match mk {
@@ -52,7 +51,7 @@ pub mod mock {
         }
 
         fn file_system(&self) -> &Self::Fs {
-            unimplemented!();
+            &MockFs
         }
     }
 
