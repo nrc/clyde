@@ -1,8 +1,8 @@
+use crate::ast;
 use crate::front;
 use crate::front::data::{Position, Range};
-use crate::ast;
 use std::fmt;
-use std::io;
+use std::io::{self, Write};
 
 pub use self::physical::PhysicalFs;
 #[cfg(test)]
@@ -17,6 +17,7 @@ pub trait FileSystem {
 
     fn find(&self, pat: SearchPattern) -> Result<Vec<Path>, Error>;
     fn resolve_location(&self, loc: ast::Location) -> Result<front::Locator, Error>;
+    fn show_path(&self, path: Path, w: &mut dyn Write) -> Result<(), Error>;
 }
 
 #[derive(Clone)]
@@ -107,11 +108,21 @@ mod test {
     pub struct MockFs;
 
     impl FileSystem for MockFs {
-        fn with_file<F, T>(&self, path: Path, _: F) -> Result<T, Error>
+        fn with_file<F, T>(&self, path: Path, f: F) -> Result<T, Error>
         where
             F: FnOnce(&File) -> T,
         {
-            Err(Error::Other(format!("{}", path.key)))
+            let mut file = File {
+                path,
+                lines: Vec::new(),
+            };
+            for i in 0..20 {
+                file.lines.push(format!(
+                    "This is line {} of a file with number {}.",
+                    i, path.key
+                ));
+            }
+            Ok(f(&file))
         }
 
         fn find(&self, pat: SearchPattern) -> Result<Vec<Path>, Error> {
@@ -125,6 +136,16 @@ mod test {
 
         fn resolve_location(&self, loc: ast::Location) -> Result<front::Locator, Error> {
             resolve_location(loc, self)
+        }
+
+        fn show_path(&self, path: Path, w: &mut dyn Write) -> Result<(), Error> {
+            match path.key {
+                1 => write!(w, "foo.rs"),
+                2 => write!(w, "bar.rs"),
+                3 => write!(w, "baz.rs"),
+                _ => panic!(),
+            }?;
+            Ok(())
         }
     }
 

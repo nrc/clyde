@@ -1,12 +1,12 @@
+use crate::ast;
 use crate::file_system::{self, File, FileSystem, Path, SearchPattern};
 use crate::front;
-use crate::ast;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::fs::File as StdFile;
 use std::hash::{Hash, Hasher};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path as StdPath, PathBuf};
 
 pub struct PhysicalFs {
@@ -101,6 +101,14 @@ impl FileSystem for PhysicalFs {
         // FIXME pre-cache the file?
         file_system::resolve_location(loc, self)
     }
+
+    fn show_path(&self, path: Path, w: &mut dyn Write) -> Result<(), file_system::Error> {
+        // TODO unwraps should return errors
+        let path_map = self.path_map.borrow();
+        let path = path_map.get(&path.key).unwrap();
+        let path = path.strip_prefix(&self.root).unwrap();
+        write!(w, "{}", path.display()).map_err(Into::into)
+    }
 }
 
 #[cfg(test)]
@@ -133,8 +141,6 @@ mod test {
         }
 
         fn create_file(&self, name: &str) {
-            use std::io::Write;
-
             let mut f = fs::File::create(&self.path(name)).unwrap();
             for i in 0..100 {
                 writeln!(f, "line {} of {}", i, name).unwrap();

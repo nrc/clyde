@@ -1,7 +1,7 @@
 pub use self::data::{Locator, MetaVar, Value};
+use crate::ast;
 use crate::env::Environment;
 use crate::file_system::{self, FileSystem};
-use crate::ast;
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
@@ -95,8 +95,8 @@ impl Default for SymbolTable {
 }
 
 pub trait Show {
-    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> io::Result<()>;
-    fn to_string(&self, env: &impl Environment) -> String {
+    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> Result<(), Error>;
+    fn show_str(&self, env: &impl Environment) -> String {
         let mut buf: Vec<u8> = Vec::new();
         self.show(&mut buf, env).unwrap();
         String::from_utf8(buf).unwrap()
@@ -104,29 +104,37 @@ pub trait Show {
 }
 
 impl<T: fmt::Display> Show for T {
-    fn show(&self, w: &mut dyn Write, _: &impl Environment) -> io::Result<()> {
-        write!(w, "{}", self).into()
+    fn show(&self, w: &mut dyn Write, _: &impl Environment) -> Result<(), Error> {
+        write!(w, "{}", self).map_err(Into::into)
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Error {
+    IoError(io::Error),
     VarNotFound(MetaVar),
     Other(String),
-}
-
-impl From<file_system::Error> for Error {
-    fn from(e: file_system::Error) -> Error {
-        Error::Other(fmt::Display::to_string(&e))
-    }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Error::IoError(e) => e.fmt(f),
             Error::VarNotFound(v) => write!(f, "Variable not found: `{}`", v),
             Error::Other(s) => write!(f, "{}", s),
         }
+    }
+}
+
+impl From<file_system::Error> for Error {
+    fn from(e: file_system::Error) -> Error {
+        Error::Other(e.to_string())
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Error {
+        Error::IoError(e)
     }
 }
 
@@ -134,8 +142,8 @@ impl fmt::Display for Error {
 mod test {
     use super::data::ValueKind;
     use super::*;
-    use crate::env::mock::MockEnv;
     use crate::ast::builder;
+    use crate::env::mock::MockEnv;
 
     fn assert_err<T: fmt::Debug>(e: Result<T, Error>, s: &str) {
         if let Err(Error::Other(msg)) = &e {
@@ -190,8 +198,4 @@ mod test {
         let mut interp = Interpreter::new(&MockEnv);
         assert_err(interp.interpret_stmt(builder::show(builder::void())), "()");
     }
-
-    // TODO test locations
-    #[test]
-    fn test_location() {}
 }

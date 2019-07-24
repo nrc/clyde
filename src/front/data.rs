@@ -1,8 +1,9 @@
-use super::Show;
+use super::{Error, Show};
 use crate::env::Environment;
-use crate::file_system::Path;
+use crate::file_system::{FileSystem, Path};
+use derive_new::new;
 use std::fmt;
-use std::io::{self, Write};
+use std::io::Write;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct MetaVar {
@@ -30,7 +31,7 @@ pub struct Value {
 }
 
 impl Show for Value {
-    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> io::Result<()> {
+    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> Result<(), Error> {
         self.kind.show(w, env)
     }
 }
@@ -70,10 +71,10 @@ pub enum ValueKind {
 }
 
 impl Show for ValueKind {
-    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> io::Result<()> {
+    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> Result<(), Error> {
         match self {
-            ValueKind::Void => write!(w, "()"),
-            ValueKind::Number(n) => write!(w, "{}", n),
+            ValueKind::Void => write!(w, "()").map_err(Into::into),
+            ValueKind::Number(n) => write!(w, "{}", n).map_err(Into::into),
             ValueKind::Set(v) => {
                 if v.len() < 5 {
                     write!(w, "[")?;
@@ -86,13 +87,13 @@ impl Show for ValueKind {
                         }
                         v.show(w, env)?;
                     }
-                    write!(w, "]")
+                    write!(w, "]").map_err(Into::into)
                 } else {
-                    write!(w, "[...]*{}", v.len())
+                    write!(w, "[...]*{}", v.len()).map_err(Into::into)
                 }
             }
-            ValueKind::Position(_) => write!(w, "TODO"),
-            ValueKind::Range(_) => write!(w, "TODO"),
+            ValueKind::Position(p) => p.show(w, env),
+            ValueKind::Range(r) => r.show(w, env),
         }
     }
 }
@@ -118,11 +119,30 @@ impl From<Locator> for Value {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(new, Clone, Debug, Eq, PartialEq)]
 pub struct Position {
     pub file: Path,
     pub line: usize,
     pub column: usize,
+}
+
+impl Show for Position {
+    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> Result<(), Error> {
+        write!(w, " --> ")?;
+        env.file_system().show_path(self.file, w)?;
+        let text = env.file_system().with_file(self.file, |file| {
+            file.lines.get(self.line).map(|s| s.to_owned())
+        })?;
+        write!(w, ":{}:{}\n", self.line + 1, self.column + 1)?;
+        write!(
+            w,
+            "{} | {}\n",
+            self.line + 1,
+            text.unwrap_or_else(|| "<error - line out of range>".to_owned())
+        )?;
+        let offset = (self.line + 1).to_string().len() + 3;
+        write!(w, "{:width$}^", "", width = offset + self.column).map_err(Into::into)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -133,7 +153,45 @@ pub enum Range {
     Span(Span),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+impl Show for Range {
+    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> Result<(), Error> {
+        match self {
+            Range::File(path) => env.file_system().show_path(*path, w).map_err(Into::into),
+            Range::MultiFile(paths) if paths.len() < 5 => {
+                write!(w, "[")?;
+                let mut first = true;
+                for p in paths {
+                    if first {
+                        first = false;
+                    } else {
+                        write!(w, ", ")?;
+                    }
+                    env.file_system().show_path(*p, w)?;
+                }
+                write!(w, "]").map_err(Into::into)
+            }
+            Range::MultiFile(paths) => write!(w, "[{} files]", paths.len()).map_err(Into::into),
+            Range::Line(path, line) => {
+                write!(w, " --> ")?;
+                env.file_system().show_path(*path, w)?;
+                let text = env
+                    .file_system()
+                    .with_file(*path, |file| file.lines.get(*line).map(|s| s.to_owned()))?;
+                write!(w, ":{}\n", line + 1)?;
+                write!(
+                    w,
+                    "{} | {}",
+                    line + 1,
+                    text.unwrap_or_else(|| "<error - line out of range>".to_owned())
+                )
+                .map_err(Into::into)
+            }
+            Range::Span(s) => s.show(w, env),
+        }
+    }
+}
+
+#[derive(new, Clone, Debug, Eq, PartialEq)]
 pub struct Span {
     pub file: Path,
     pub start_line: usize,
@@ -142,20 +200,66 @@ pub struct Span {
     pub end_column: usize,
 }
 
+impl Show for Span {
+    fn show(&self, w: &mut dyn Write, env: &impl Environment) -> Result<(), Error> {
+        write!(w, " --> ")?;
+        env.file_system().show_path(self.file, w)?;
+        if self.start_line == self.end_line {
+            // A span on one line
+            let text = env.file_system().with_file(self.file, |file| {
+                file.lines.get(self.start_line).map(|s| s.to_owned())
+            })?;
+            write!(
+                w,
+                ":{}:{}->{}\n",
+                self.start_line + 1,
+                self.start_column + 1,
+                self.end_column + 1
+            )?;
+            write!(
+                w,
+                "{} | {}\n",
+                self.start_line + 1,
+                text.unwrap_or_else(|| "<error - line out of range>".to_owned())
+            )?;
+            let offset = (self.start_line + 1).to_string().len() + 3;
+            write!(
+                w,
+                "{:width1$}{}",
+                "",
+                "^".repeat(self.end_column - self.start_column),
+                width1 = offset + self.start_column
+            )
+            .map_err(Into::into)
+        } else {
+            // A multispan range
+            write!(
+                w,
+                ":{}:{}->{}:{}\n",
+                self.start_line + 1,
+                self.start_column + 1,
+                self.end_line + 1,
+                self.end_column + 1
+            )
+            .map_err(Into::into)
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::env::mock::MockEnv;
 
     #[test]
-    fn test_value_display() {
-        assert_eq!(Value::void().to_string(&MockEnv), "()");
-        assert_eq!(Value::number(42).to_string(&MockEnv), "42");
+    fn test_value_show() {
+        assert_eq!(Value::void().show_str(&MockEnv), "()");
+        assert_eq!(Value::number(42).show_str(&MockEnv), "42");
         let set = Value {
             kind: ValueKind::Set(vec![Value::number(1), Value::number(2), Value::number(3)]),
             ty: Type::Set(Box::new(Type::Number)),
         };
-        assert_eq!(set.to_string(&MockEnv), "[1, 2, 3]");
+        assert_eq!(set.show_str(&MockEnv), "[1, 2, 3]");
         let set = Value {
             kind: ValueKind::Set(vec![
                 Value::number(1),
@@ -169,6 +273,41 @@ mod test {
             ]),
             ty: Type::Set(Box::new(Type::Number)),
         };
-        assert_eq!(set.to_string(&MockEnv), "[...]*8");
+        assert_eq!(set.show_str(&MockEnv), "[...]*8");
+    }
+
+    #[test]
+    fn test_location_show() {
+        let env = MockEnv;
+        let fs = env.file_system();
+
+        let pos = Position::new(
+            fs.find("foo.rs".to_owned().into()).unwrap().pop().unwrap(),
+            2,
+            3,
+        );
+        let s = pos.show_str(&env);
+        assert!(s.contains("foo.rs:3"));
+        assert!(s.contains("This is line 2 of a file with number 1."));
+
+        let range = Range::Line(
+            fs.find("foo.rs".to_owned().into()).unwrap().pop().unwrap(),
+            3,
+        );
+        let s = range.show_str(&env);
+        assert!(s.contains("foo.rs:4"));
+        assert!(s.contains("This is line 3 of a file with number 1."));
+
+        let span = Span::new(
+            fs.find("foo.rs".to_owned().into()).unwrap().pop().unwrap(),
+            3,
+            1,
+            3,
+            10,
+        );
+        let s = span.show_str(&env);
+        eprintln!("{}", s);
+        assert!(s.contains("foo.rs:4:2->11"));
+        assert!(s.contains("This is line 3 of a file with number 1."));
     }
 }

@@ -93,7 +93,7 @@ impl Environment for Repl {
     }
 
     fn show(&self, s: &impl Show) -> Result<(), front::Error> {
-        println!("{}", s.to_string(self));
+        println!("{}", s.show_str(self));
         Ok(())
     }
 

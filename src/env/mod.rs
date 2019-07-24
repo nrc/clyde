@@ -34,8 +34,8 @@ pub mod mock {
         }
 
         fn show(&self, s: &impl Show) -> Result<(), front::Error> {
-            eprintln!("show: {}", s.to_string(self));
-            Err(front::Error::Other(s.to_string(self)))
+            eprintln!("show: {}", s.show_str(self));
+            Err(front::Error::Other(s.show_str(self)))
         }
 
         fn lookup_var(&self, _: &front::MetaVar) -> Result<front::Value, front::Error> {
