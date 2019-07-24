@@ -19,7 +19,8 @@ impl Node for Statement {}
 
 pub enum StatementKind {
     Expr(ExprKind),
-    Show(Show),
+    // foo expr
+    ApplyShorthand(Apply),
     Meta(MetaKind),
 }
 
@@ -31,34 +32,18 @@ pub struct Expr {
 impl Node for Expr {}
 
 pub enum ExprKind {
-    Select(Select),
     MetaVar(MetaVarKind),
     // ()
     Void,
-    // (foo expr)
+    // expr->foo
     Apply(Apply),
     // (:...)
     Location(Location),
 }
 
-// FIXME Select and Show could just use Apply
-pub struct Select {
-    pub multiplicity: Multiplicity,
-    pub filters: Vec<Expr>,
-    pub ctx: Context,
-}
-
-impl Node for Select {}
-
-pub struct Show {
-    pub expr: Box<Expr>,
-    pub ctx: Context,
-}
-
-impl Node for Show {}
-
 pub struct Apply {
     pub ident: Identifier,
+    pub lhs: Box<Expr>,
     pub args: Vec<Expr>,
     pub ctx: Context,
 }
@@ -96,12 +81,6 @@ pub struct Identifier {
 
 impl Node for Identifier {}
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum Multiplicity {
-    Many,
-    One,
-}
-
 #[cfg(test)]
 pub mod builder {
     use super::*;
@@ -119,8 +98,10 @@ pub mod builder {
 
     pub fn show(e: Expr) -> Statement {
         Statement {
-            kind: StatementKind::Show(Show {
-                expr: Box::new(e),
+            kind: StatementKind::ApplyShorthand(Apply {
+                ident: ident("show"),
+                lhs: Box::new(e),
+                args: vec![],
                 ctx: ctx(),
             }),
             ctx: ctx(),

@@ -65,7 +65,6 @@ pub struct TokenTree {
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum SymbolKind {
     Caret,
-    Asterisk,
     Dollar,
 
     SemiColon,
@@ -81,7 +80,6 @@ impl fmt::Display for SymbolKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             SymbolKind::Caret => write!(f, "^"),
-            SymbolKind::Asterisk => write!(f, "*"),
             SymbolKind::Dollar => write!(f, "$"),
             SymbolKind::SemiColon => write!(f, ";"),
             SymbolKind::Hash => write!(f, "#"),

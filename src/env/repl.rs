@@ -98,10 +98,11 @@ impl Environment for Repl {
     }
 
     fn lookup_var(&self, var: &front::MetaVar) -> Result<front::Value, front::Error> {
-        // FIXME lookup variable by name
+        // TODO lookup variable by name
         Err(front::Error::VarNotFound(var.clone()))
     }
     fn lookup_numeric_var(&self, id: isize) -> Result<front::Value, front::Error> {
+        // TODO
         unimplemented!();
     }
 

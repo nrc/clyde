@@ -65,7 +65,6 @@ impl<'a> Lexer<'a> {
         match chars.next().unwrap() {
             '^' => Ok(Some((self.make_symbol(SymbolKind::Caret), 1))),
             '$' => Ok(Some((self.make_symbol(SymbolKind::Dollar), 1))),
-            '*' => Ok(Some((self.make_symbol(SymbolKind::Asterisk), 1))),
             '=' => Ok(Some((self.make_symbol(SymbolKind::Eq), 1))),
             '#' => Ok(Some((self.make_symbol(SymbolKind::Hash), 1))),
             ';' => Ok(Some((self.make_symbol(SymbolKind::SemiColon), 1))),
@@ -81,7 +80,8 @@ impl<'a> Lexer<'a> {
             // A nested token tree, we don't lex this beyond matching delimiters, and
             // store the result as a RawTree.
             '(' => self.lex_raw_tree(),
-            c if c.is_alphabetic() => self.lex_ident(),
+            c if c.is_alphabetic() || c == '_' => self.lex_ident(),
+            c if c.is_numeric() => self.lex_number(),
             c if c.is_whitespace() => Ok(None),
             _ => Err(self.make_err("Unexpected token".to_owned(), 0)),
         }
@@ -94,7 +94,7 @@ impl<'a> Lexer<'a> {
         let mut len = 0;
         loop {
             match chars.next() {
-                Some(c) if c.is_alphanumeric() => {
+                Some(c) if c.is_alphanumeric() || c == '_' => {
                     len += c.len_utf8();
                 }
                 _ => break,
@@ -103,6 +103,26 @@ impl<'a> Lexer<'a> {
         Ok(Some((
             Token::new(TokenKind::Ident, self.make_span(len)),
             len,
+        )))
+    }
+
+    fn lex_number(&self) -> Result<Option<(Token, usize)>, parse::Error> {
+        let mut chars = self.input[self.position..].chars();
+        let mut number = String::new();
+        loop {
+            match chars.next() {
+                Some(c) if c.is_numeric() => {
+                    number.push(c);
+                }
+                _ => break,
+            }
+        }
+        Ok(Some((
+            Token::new(
+                TokenKind::Number(self.err_from_parse(number.parse())?),
+                self.make_span(number.len()),
+            ),
+            number.len(),
         )))
     }
 
@@ -152,6 +172,15 @@ impl<'a> Lexer<'a> {
 
     fn make_err(&self, msg: String, offset: usize) -> parse::Error {
         parse::Error::Lexing(msg, self.offset + self.position + offset)
+    }
+
+    fn err_from_parse<T>(&self, r: Result<T, std::num::ParseIntError>) -> Result<T, parse::Error> {
+        r.map_err(|e| {
+            parse::Error::Lexing(
+                format!("Error parsing numeric value {}", e),
+                self.offset + self.position,
+            )
+        })
     }
 
     fn make_symbol(&self, kind: SymbolKind) -> Token {
@@ -246,6 +275,62 @@ mod test {
                     ]
                 }),
                 span: Span::new(0, "  foo  (fd && dfs: Foo( )  ) ".to_owned()),
+            }
+        );
+    }
+
+    #[test]
+    fn lex_ident() {
+        assert_eq!(
+            lex("foo", 0).unwrap(),
+            Token {
+                kind: TokenKind::Tree(TokenTree {
+                    tokens: vec![Token {
+                        kind: TokenKind::Ident,
+                        span: Span::new(0, "foo".to_owned())
+                    },]
+                }),
+                span: Span::new(0, "foo".to_owned()),
+            }
+        );
+        assert_eq!(
+            lex("_foo1", 0).unwrap(),
+            Token {
+                kind: TokenKind::Tree(TokenTree {
+                    tokens: vec![Token {
+                        kind: TokenKind::Ident,
+                        span: Span::new(0, "_foo1".to_owned())
+                    },]
+                }),
+                span: Span::new(0, "_foo1".to_owned()),
+            }
+        );
+        assert_eq!(
+            lex("_42", 0).unwrap(),
+            Token {
+                kind: TokenKind::Tree(TokenTree {
+                    tokens: vec![Token {
+                        kind: TokenKind::Ident,
+                        span: Span::new(0, "_42".to_owned())
+                    },]
+                }),
+                span: Span::new(0, "_42".to_owned()),
+            }
+        );
+    }
+
+    #[test]
+    fn lex_number() {
+        assert_eq!(
+            lex("42", 0).unwrap(),
+            Token {
+                kind: TokenKind::Tree(TokenTree {
+                    tokens: vec![Token {
+                        kind: TokenKind::Number(42),
+                        span: Span::new(0, "42".to_owned())
+                    },]
+                }),
+                span: Span::new(0, "42".to_owned()),
             }
         );
     }

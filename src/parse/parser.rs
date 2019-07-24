@@ -28,8 +28,8 @@ impl Parser {
 
         let mut kind = None;
         match tok.kind {
-            tokens::TokenKind::Ident if &*tok.span.text == "show" => {
-                kind = Some(ast::StatementKind::Show(self.show()?));
+            tokens::TokenKind::Ident => {
+                kind = Some(ast::StatementKind::ApplyShorthand(self.apply_shorthand()?));
             }
             tokens::TokenKind::Symbol(sym) if sym == tokens::SymbolKind::Caret => {
                 kind = Some(ast::StatementKind::Meta(self.meta()?));
@@ -65,10 +65,6 @@ impl Parser {
             None => return Ok(None),
         };
         let kind = match tok.kind {
-            tokens::TokenKind::Ident => match &*tok.span.text {
-                "select" => ast::ExprKind::Select(self.select()?),
-                _ => return Ok(None),
-            },
             tokens::TokenKind::Symbol(sym) => match sym {
                 tokens::SymbolKind::Dollar => {
                     self.bump();
@@ -106,43 +102,23 @@ impl Parser {
         }))
     }
 
-    fn select(&mut self) -> Result<ast::Select, Error> {
-        self.assert_ident("select")?;
-
-        let mut multiplicity = ast::Multiplicity::One;
-        if let Some(tok) = self.peek() {
-            match &tok.kind {
-                tokens::TokenKind::Symbol(s) if *s == tokens::SymbolKind::Asterisk => {
-                    self.bump();
-                    multiplicity = ast::Multiplicity::Many;
-                }
-                _ => {}
-            };
-        }
-
-        let filters = self.one_or_more("expression", |this| this.maybe_expr())?;
-
-        Ok(ast::Select {
-            multiplicity,
-            filters,
-            ctx: self.ctx.clone(),
-        })
-    }
-
-    fn show(&mut self) -> Result<ast::Show, Error> {
-        self.assert_ident("show")?;
+    fn apply_shorthand(&mut self) -> Result<ast::Apply, Error> {
+        let ident = self.identifier()?;
         let expr = Box::new(self.parse_expr()?);
-        Ok(ast::Show {
-            expr,
+        Ok(ast::Apply {
+            ident,
+            lhs: expr,
+            args: vec![],
             ctx: self.ctx.clone(),
         })
     }
 
-    fn apply(&mut self) -> Result<ast::Apply, Error> {
+    fn apply(&mut self, lhs: Box<ast::Expr>) -> Result<ast::Apply, Error> {
         let ident = self.identifier()?;
         let args = self.one_or_more("expression", |this| this.maybe_expr())?;
         Ok(ast::Apply {
             ident,
+            lhs,
             args,
             ctx: self.ctx.clone(),
         })
@@ -399,7 +375,7 @@ mod test {
         let toks = lexer::lex("show $;", 0).unwrap();
         parser(toks).parse_stmt().unwrap();
 
-        let toks = lexer::lex("select* (id $)", 0).unwrap();
+        let toks = lexer::lex("select (id $)", 0).unwrap();
         parser(toks).parse_stmt().unwrap();
     }
 
