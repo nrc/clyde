@@ -66,6 +66,7 @@ pub struct TokenTree {
 pub enum SymbolKind {
     Caret,
     Dollar,
+    Dot,
 
     SemiColon,
     Hash,
@@ -81,6 +82,7 @@ impl fmt::Display for SymbolKind {
         match self {
             SymbolKind::Caret => write!(f, "^"),
             SymbolKind::Dollar => write!(f, "$"),
+            SymbolKind::Dot => write!(f, "."),
             SymbolKind::SemiColon => write!(f, ";"),
             SymbolKind::Hash => write!(f, "#"),
             SymbolKind::Eq => write!(f, "="),

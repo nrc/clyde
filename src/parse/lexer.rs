@@ -65,6 +65,7 @@ impl<'a> Lexer<'a> {
         match chars.next().unwrap() {
             '^' => Ok(Some((self.make_symbol(SymbolKind::Caret), 1))),
             '$' => Ok(Some((self.make_symbol(SymbolKind::Dollar), 1))),
+            '.' => Ok(Some((self.make_symbol(SymbolKind::Dot), 1))),
             '=' => Ok(Some((self.make_symbol(SymbolKind::Eq), 1))),
             '#' => Ok(Some((self.make_symbol(SymbolKind::Hash), 1))),
             ';' => Ok(Some((self.make_symbol(SymbolKind::SemiColon), 1))),

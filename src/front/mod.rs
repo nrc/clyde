@@ -61,6 +61,7 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
                 Ok(loc.into())
             }
             ast::ExprKind::Apply(a) => self.interpret_apply(a),
+            ast::ExprKind::Field(p) => self.interpret_apply(p.into()),
             _ => unimplemented!(),
         }
     }
@@ -71,6 +72,7 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
             ast::ExprKind::MetaVar(kind) => self.lookup_var(kind).map(|val| val.ty),
             ast::ExprKind::Location(_) => Ok(Type::Location),
             ast::ExprKind::Apply(a) => self.type_apply(a),
+            ast::ExprKind::Field(p) => self.type_apply(&(*p).clone().into()),
             _ => unimplemented!(),
         }
     }

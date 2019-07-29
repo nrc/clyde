@@ -114,6 +114,19 @@ impl Parser {
             });
         }
 
+        if let Some(tokens::Token {
+            kind: tokens::TokenKind::Symbol(tokens::SymbolKind::Dot),
+            ..
+        }) = &self.peek()
+        {
+            return self.field(Box::new(expr)).map(|p| {
+                Some(ast::Expr {
+                    kind: ast::ExprKind::Field(p),
+                    ctx: self.ctx.clone(),
+                })
+            });
+        }
+
         Ok(Some(expr))
     }
 
@@ -136,6 +149,16 @@ impl Parser {
             ident,
             lhs,
             args,
+            ctx: self.ctx.clone(),
+        })
+    }
+
+    fn field(&mut self, lhs: Box<ast::Expr>) -> Result<ast::Projection, Error> {
+        self.assert_sym(tokens::SymbolKind::Dot)?;
+        let ident = self.identifier()?;
+        Ok(ast::Projection {
+            ident,
+            lhs,
             ctx: self.ctx.clone(),
         })
     }

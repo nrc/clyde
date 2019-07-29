@@ -10,6 +10,7 @@ pub struct Program {
 
 impl Node for Program {}
 
+#[derive(Clone)]
 pub struct Statement {
     pub kind: StatementKind,
     pub ctx: Context,
@@ -17,6 +18,7 @@ pub struct Statement {
 
 impl Node for Statement {}
 
+#[derive(Clone)]
 pub enum StatementKind {
     Expr(ExprKind),
     // foo expr
@@ -24,6 +26,7 @@ pub enum StatementKind {
     Meta(MetaKind),
 }
 
+#[derive(Clone)]
 pub struct Expr {
     pub kind: ExprKind,
     pub ctx: Context,
@@ -31,6 +34,7 @@ pub struct Expr {
 
 impl Node for Expr {}
 
+#[derive(Clone)]
 pub enum ExprKind {
     MetaVar(MetaVarKind),
     // ()
@@ -39,8 +43,11 @@ pub enum ExprKind {
     Apply(Apply),
     // (:...)
     Location(Location),
+    // expr.foo
+    Field(Projection),
 }
 
+#[derive(Clone)]
 pub struct Apply {
     pub ident: Identifier,
     pub lhs: Box<Expr>,
@@ -50,7 +57,27 @@ pub struct Apply {
 
 impl Node for Apply {}
 
-#[derive(new)]
+#[derive(Clone)]
+pub struct Projection {
+    pub ident: Identifier,
+    pub lhs: Box<Expr>,
+    pub ctx: Context,
+}
+
+impl Node for Projection {}
+
+impl From<Projection> for Apply {
+    fn from(p: Projection) -> Apply {
+        Apply {
+            ident: p.ident,
+            lhs: p.lhs,
+            args: Vec::new(),
+            ctx: p.ctx,
+        }
+    }
+}
+
+#[derive(new, Clone)]
 pub struct Location {
     pub file: Option<String>,
     pub line: Option<usize>,

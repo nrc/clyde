@@ -18,16 +18,14 @@ Statements may be terminated with an optional `;`
 * TODO Concatenation: `name '+=' expr`
 * Meta-command: `'^' command`
 * TODO in-place function application: `name '<-' name ['(' args ')']`
-* TODO zero-arg function shorthand name [flags] expr
-
-TODO remove `show` statement, `select*`
+* zero-arg function shorthand name [flags] expr
 
 ### Expressions
 
 * Parens: `(expr)`
 * Locations: `'('':'name[:line[:column]]')'` - name is a string, line and column are unsigned ints
-* TODO function application: `expr '->' name [flags] ['(' args ')']`
-* TODO field projection: `expr '.' name`
+* function application: `expr '->' name [flags] ['(' args ')']`
+* field projection: `expr '.' name`
 * TODO variables: `name | '$' | '$' n`
 * TODO path: `'('['::'name]+')'`
 
@@ -43,12 +41,12 @@ TODO remove `show` statement, `select*`
 
 ### Functions
 
-* TODO `show`: `query -> string` make a short text representation
+* `show`: `query -> string` make a short text representation
   - redirect to file
   - long form
   - list form
   - short form
-* TODO `select`: `query -> set` evaluate a query
+* `select`: `query -> set` evaluate a query
 * TODO `eq`: `T, T -> T?` equality
 * TODO `match`: `string:T, regex -> T?` regex matching
 * TODO `find`: `ident -> set<ident>` find all refs
