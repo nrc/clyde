@@ -1,4 +1,4 @@
-use super::{Error, Show};
+use super::{query::Query, Error, Show};
 use crate::env::Environment;
 use crate::file_system::{FileSystem, Path};
 use derive_new::new;
@@ -55,10 +55,21 @@ impl Value {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Type {
     Void,
+    Query(Box<Type>),
     Number,
     Set(Box<Type>),
+    Location,
     Position,
     Range,
+}
+
+impl Type {
+    pub fn is_query(&self) -> bool {
+        match self {
+            Type::Query(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -68,6 +79,7 @@ pub enum ValueKind {
     Set(Vec<Value>),
     Position(Position),
     Range(Range),
+    Query(Query),
 }
 
 impl Show for ValueKind {
@@ -94,6 +106,7 @@ impl Show for ValueKind {
             }
             ValueKind::Position(p) => p.show(w, env),
             ValueKind::Range(r) => r.show(w, env),
+            ValueKind::Query(_) => write!(w, "Query").map_err(Into::into),
         }
     }
 }

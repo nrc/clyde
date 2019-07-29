@@ -85,8 +85,8 @@ impl fmt::Display for SymbolKind {
             SymbolKind::Hash => write!(f, "#"),
             SymbolKind::Eq => write!(f, "="),
             SymbolKind::PlusEq => write!(f, "+="),
-            SymbolKind::ArrowLeft => write!(f, "->"),
-            SymbolKind::ArrowRight => write!(f, "<-"),
+            SymbolKind::ArrowLeft => write!(f, "<-"),
+            SymbolKind::ArrowRight => write!(f, "->"),
         }
     }
 }

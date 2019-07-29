@@ -96,10 +96,25 @@ impl Parser {
             _ => return Ok(None),
         };
 
-        Ok(Some(ast::Expr {
+        let expr = ast::Expr {
             kind,
             ctx: self.ctx.clone(),
-        }))
+        };
+
+        if let Some(tokens::Token {
+            kind: tokens::TokenKind::Symbol(tokens::SymbolKind::ArrowRight),
+            ..
+        }) = &self.peek()
+        {
+            return self.apply(Box::new(expr)).map(|a| {
+                Some(ast::Expr {
+                    kind: ast::ExprKind::Apply(a),
+                    ctx: self.ctx.clone(),
+                })
+            });
+        }
+
+        Ok(Some(expr))
     }
 
     fn apply_shorthand(&mut self) -> Result<ast::Apply, Error> {
@@ -114,6 +129,7 @@ impl Parser {
     }
 
     fn apply(&mut self, lhs: Box<ast::Expr>) -> Result<ast::Apply, Error> {
+        self.assert_sym(tokens::SymbolKind::ArrowRight)?;
         let ident = self.identifier()?;
         let args = self.one_or_more("expression", |this| this.maybe_expr())?;
         Ok(ast::Apply {
@@ -404,5 +420,22 @@ mod test {
             .location()
             .unwrap();
         assert!(loc.file.is_some() && loc.line.is_some() && loc.column.is_some());
+    }
+
+    #[test]
+    fn apply() {
+        let toks = lexer::lex(" $ ->foo(bar)", 0).unwrap();
+        let expr = parser(toks).parse_expr().unwrap();
+        match &expr.kind {
+            ast::ExprKind::Apply(a) if a.ident.name == "foo" => {}
+            _ => panic!(),
+        }
+
+        let toks = lexer::lex("foo $", 0).unwrap();
+        let stmt = parser(toks).parse_stmt().unwrap();
+        match &stmt.kind {
+            ast::StatementKind::ApplyShorthand(a) if a.ident.name == "foo" => {}
+            _ => panic!(),
+        }
     }
 }
