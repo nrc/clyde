@@ -6,3 +6,5 @@ edition = "2018"
 
 [dependencies]
 derive-new = "0.5"
+rls-analysis = { version = "0.18.1", features = ["idents"] }
+rls-span = { version = "0.5.2", features = ["nightly"] }

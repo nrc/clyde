@@ -1,25 +1,29 @@
 use super::Environment;
+use crate::back;
 use crate::file_system::PhysicalFs;
 use crate::front::{self, Show};
 use crate::parse::{self, ast};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::env;
 use std::io::{stdin, stdout, Write};
 use std::path::PathBuf;
 use std::process;
+use std::rc::Rc;
 
 pub struct Repl {
     config: Config,
     line_count: Cell<usize>,
-    file_system: PhysicalFs,
+    file_system: Rc<PhysicalFs>,
+    rls: RefCell<Option<Rc<back::Rls<PhysicalFs>>>>,
 }
 
 impl Repl {
     pub fn new(config: Config) -> Repl {
         Repl {
-            file_system: PhysicalFs::new(&config.current_dir),
+            file_system: Rc::new(PhysicalFs::new(&config.current_dir)),
             config,
             line_count: Cell::new(0),
+            rls: RefCell::new(None),
         }
     }
 
@@ -109,10 +113,21 @@ impl Environment for Repl {
     fn file_system(&self) -> &PhysicalFs {
         &self.file_system
     }
+
+    fn backend(&self) -> Rc<dyn back::Backend> {
+        let mut rls = self.rls.borrow_mut();
+        match &*rls {
+            Some(rls) => rls.clone(),
+            None => {
+                *rls = Some(Rc::new(back::Rls::init(self.file_system.clone())));
+                rls.as_ref().unwrap().clone()
+            }
+        }
+    }
 }
 
 pub struct Config {
-    current_dir: PathBuf,
+    pub current_dir: PathBuf,
 }
 
 impl Default for Config {

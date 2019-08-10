@@ -1,7 +1,7 @@
 use crate::ast;
 use crate::env::Environment;
 use crate::front::data::{Type, Value, ValueKind};
-use crate::front::{Error, Interpreter};
+use crate::front::{query, Error, Interpreter};
 use std::fmt;
 
 pub enum Arity {
@@ -67,7 +67,8 @@ impl Function for Show {
     ) -> Result<Value, Error> {
         let lhs = interpreter.interpret_expr(lhs.kind)?;
         if lhs.ty.is_query() {
-            // TODO
+            let value = lhs.expect_query().eval(&*interpreter.env.backend())?;
+            interpreter.env.show(&value)?;
         } else {
             interpreter.env.show(&lhs)?;
         }
@@ -98,7 +99,7 @@ impl Function for Select {
     ) -> Result<Value, Error> {
         let lhs = interpreter.interpret_expr(lhs.kind)?;
         match &lhs.kind {
-            ValueKind::Query(q) => unimplemented!(),
+            ValueKind::Query(q) => q.eval(&*interpreter.env.backend()),
             _ => Err(Error::TypeError(format!(
                 "Expected query, found {:?}",
                 lhs.ty
@@ -116,5 +117,42 @@ impl Function for Select {
             Type::Query(ty) => Ok(*ty),
             ty => Err(Error::TypeError(format!("Expected query, found {:?}", ty))),
         }
+    }
+}
+
+pub struct Idents {}
+
+impl Function for Idents {
+    const NAME: &'static str = "idents";
+    const ARITY: Arity = Arity::None;
+
+    fn eval(
+        &self,
+        interpreter: &mut Interpreter<'_, impl Environment>,
+        lhs: Box<ast::Expr>,
+        _: Vec<ast::Expr>,
+    ) -> Result<Value, Error> {
+        let lhs = interpreter.interpret_expr(lhs.kind)?;
+        Ok(Value {
+            kind: ValueKind::Query(query::Idents::new(lhs.into())),
+            ty: Type::Query(Box::new(Type::Set(Box::new(Type::Identifier)))),
+        })
+    }
+
+    fn ty(
+        &self,
+        interpreter: &mut Interpreter<'_, impl Environment>,
+        lhs: &ast::Expr,
+        _: &[ast::Expr],
+    ) -> Result<Type, Error> {
+        let ty_lhs = interpreter.type_expr(&lhs.kind)?;
+        if !ty_lhs.is_location() {
+            return Err(Error::TypeError(format!(
+                "Expected location, found {:?}",
+                ty_lhs
+            )));
+        }
+
+        Ok(Type::Query(Box::new(Type::Set(Box::new(Type::Identifier)))))
     }
 }

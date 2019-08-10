@@ -1,6 +1,7 @@
 pub use self::data::{Locator, MetaVar, Type, Value};
 use self::function::Function;
 use crate::ast;
+use crate::back;
 use crate::env::Environment;
 use crate::file_system::{self, FileSystem};
 use std::collections::HashMap;
@@ -36,20 +37,21 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
         match stmt.kind {
             ast::StatementKind::Expr(expr) => {
                 let value = self.interpret_expr(expr)?;
-                if value.kind != data::ValueKind::Void {
-                    self.env.show(&value)?;
-                }
-                Ok(())
+                self.show_result(&value)
             }
             ast::StatementKind::Meta(mk) => self.env.exec_meta(mk),
             ast::StatementKind::ApplyShorthand(a) => {
                 let value = self.interpret_apply(a)?;
-                if value.kind != data::ValueKind::Void {
-                    self.env.show(&value)?;
-                }
-                Ok(())
+                self.show_result(&value)
             } //_ => unimplemented!(),
         }
+    }
+
+    fn show_result(&self, value: &Value) -> Result<(), Error> {
+        if !value.kind.is_void() {
+            self.env.show(value)?;
+        }
+        Ok(())
     }
 
     fn interpret_expr(&mut self, expr: ast::ExprKind) -> Result<Value, Error> {
@@ -92,7 +94,7 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
             }
         };
 
-        interpret!(apply.ident.name, Select, Show)
+        interpret!(apply.ident.name, Select, Show, Idents)
     }
 
     fn type_apply(&mut self, apply: &ast::Apply) -> Result<Type, Error> {
@@ -109,7 +111,7 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
             }
         };
 
-        typ!(apply.ident.name, Select, Show)
+        typ!(apply.ident.name, Select, Show, Idents)
     }
 
     fn lookup_var(&mut self, kind: &ast::MetaVarKind) -> Result<Value, Error> {
@@ -191,6 +193,12 @@ impl fmt::Display for Error {
 
 impl From<file_system::Error> for Error {
     fn from(e: file_system::Error) -> Error {
+        Error::Other(e.to_string())
+    }
+}
+
+impl From<back::Error> for Error {
+    fn from(e: back::Error) -> Error {
         Error::Other(e.to_string())
     }
 }

@@ -1,6 +1,7 @@
 use crate::ast;
 use crate::file_system::{self, File, FileSystem, Path, SearchPattern};
 use crate::front;
+use crate::front::data::Range;
 use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -10,7 +11,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path as StdPath, PathBuf};
 
 pub struct PhysicalFs {
-    root: PathBuf,
+    pub root: PathBuf,
     path_map: RefCell<HashMap<u64, PathBuf>>,
     file_cache: RefCell<HashMap<u64, File>>,
 }
@@ -25,15 +26,14 @@ impl PhysicalFs {
     }
 
     fn insert_path(&self, path: PathBuf) -> Result<Path, file_system::Error> {
-        if path.is_absolute() {
-            return Err(file_system::Error::BadLocation(format!(
-                "absolute path: `{}`",
-                path.display()
-            )));
-        }
+        let abs_path = if path.is_absolute() {
+            path
+        } else {
+            let mut abs_path = self.root.clone();
+            abs_path.push(path);
+            abs_path
+        };
 
-        let mut abs_path = self.root.clone();
-        abs_path.push(path);
         let abs_path = abs_path.canonicalize()?;
 
         let mut hasher = DefaultHasher::new();
@@ -108,6 +108,37 @@ impl FileSystem for PhysicalFs {
         let path = path_map.get(&path.key).unwrap();
         let path = path.strip_prefix(&self.root).unwrap();
         write!(w, "{}", path.display()).map_err(Into::into)
+    }
+
+    fn snippet(&self, range: &Range) -> Result<String, file_system::Error> {
+        match range {
+            Range::File(p) => self.with_file(*p, |f| f.lines.join("\n")),
+            Range::MultiFile(_) => unimplemented!(),
+            // FIXME line out of range should be an error, not panic
+            Range::Line(p, line) => self.with_file(*p, |f| f.lines[*line].clone()),
+            Range::Span(span) => self.with_file(span.file, |f| {
+                if span.end_line == span.start_line {
+                    return f.lines[span.start_line][span.start_column..span.end_column].to_owned();
+                }
+                let mut result = f.lines[span.start_line][span.start_column..].to_owned();
+                result.push('\n');
+                if span.end_line - span.start_line >= 2 {
+                    let lines = f.lines[span.start_line + 1..span.end_line - 1].join("\n");
+                    result.push_str(&lines);
+                    result.push('\n');
+                }
+                result.push_str(&f.lines[span.end_line][..span.end_column]);
+                result
+            }),
+        }
+    }
+
+    fn physical_path(&self, path: &Path) -> Result<PathBuf, file_system::Error> {
+        let path_map = self.path_map.borrow();
+        let path = path_map
+            .get(&path.key)
+            .expect(&format!("could not find {:?}", path));
+        Ok(path.to_owned())
     }
 }
 

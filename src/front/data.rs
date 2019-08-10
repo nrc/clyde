@@ -24,7 +24,7 @@ impl fmt::Display for MetaVar {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct Value {
     pub ty: Type,
     pub kind: ValueKind,
@@ -33,6 +33,15 @@ pub struct Value {
 impl Show for Value {
     fn show(&self, w: &mut dyn Write, env: &impl Environment) -> Result<(), Error> {
         self.kind.show(w, env)
+    }
+}
+
+impl From<Value> for Query {
+    fn from(value: Value) -> Query {
+        match value.kind {
+            ValueKind::Query(q) => q,
+            _ => Query::ready(value),
+        }
     }
 }
 
@@ -50,7 +59,41 @@ impl Value {
             kind: ValueKind::Number(n),
         }
     }
+
+    pub fn string(s: String) -> Value {
+        Value {
+            ty: Type::String,
+            kind: ValueKind::String(s),
+        }
+    }
+
+    pub fn expect_query(self) -> Query {
+        match self.kind {
+            ValueKind::Query(q) => q,
+            _ => panic!(),
+        }
+    }
+
+    pub fn expect_string(self) -> String {
+        match self.kind {
+            ValueKind::String(s) => s,
+            _ => panic!(),
+        }
+    }
 }
+
+// Subtype rules
+//
+// T <= Set(T)
+// Void == Set(v) if v.is_empty()
+// T <= Query(T)
+// Position <= Location
+// Range <= Location
+//
+// Special rules (coercion in evaluation)
+//
+// Set(T) << T
+// Query(T) << T
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Type {
@@ -58,9 +101,11 @@ pub enum Type {
     Query(Box<Type>),
     Number,
     Set(Box<Type>),
+    Identifier,
     Location,
     Position,
     Range,
+    String,
 }
 
 impl Type {
@@ -70,9 +115,17 @@ impl Type {
             _ => false,
         }
     }
+
+    pub fn is_location(&self) -> bool {
+        match self {
+            Type::Location | Type::Position | Type::Range => true,
+            Type::Query(ty) | Type::Set(ty) => ty.is_location(),
+            _ => false,
+        }
+    }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone)]
 pub enum ValueKind {
     Void,
     Number(usize),
@@ -80,6 +133,18 @@ pub enum ValueKind {
     Position(Position),
     Range(Range),
     Query(Query),
+    Identifier(Identifier),
+    String(String),
+}
+
+impl ValueKind {
+    pub fn is_void(&self) -> bool {
+        match self {
+            ValueKind::Void => true,
+            ValueKind::Set(v) if v.is_empty() => true,
+            _ => false,
+        }
+    }
 }
 
 impl Show for ValueKind {
@@ -106,9 +171,18 @@ impl Show for ValueKind {
             }
             ValueKind::Position(p) => p.show(w, env),
             ValueKind::Range(r) => r.show(w, env),
-            ValueKind::Query(_) => write!(w, "Query").map_err(Into::into),
+            ValueKind::String(s) => write!(w, "\"{}\"", s).map_err(Into::into),
+            ValueKind::Identifier(id) => write!(w, "`{}`", id.name).map_err(Into::into),
+            ValueKind::Query(_) => write!(w, "<Query>").map_err(Into::into),
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Identifier {
+    pub id: u64,
+    pub span: Span,
+    pub name: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -208,8 +282,8 @@ impl Show for Range {
 pub struct Span {
     pub file: Path,
     pub start_line: usize,
-    pub start_column: usize,
     pub end_line: usize,
+    pub start_column: usize,
     pub end_column: usize,
 }
 
@@ -319,7 +393,6 @@ mod test {
             10,
         );
         let s = span.show_str(&env);
-        eprintln!("{}", s);
         assert!(s.contains("foo.rs:4:2->11"));
         assert!(s.contains("This is line 3 of a file with number 1."));
     }

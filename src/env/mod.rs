@@ -1,6 +1,8 @@
+use crate::back::Backend;
 use crate::file_system::FileSystem;
 use crate::front::{self, Show};
 use crate::parse::{self, ast};
+use std::rc::Rc;
 
 pub(crate) mod repl;
 
@@ -13,6 +15,7 @@ pub trait Environment {
     fn lookup_var(&self, var: &front::MetaVar) -> Result<front::Value, front::Error>;
     fn lookup_numeric_var(&self, id: isize) -> Result<front::Value, front::Error>;
     fn file_system(&self) -> &Self::Fs;
+    fn backend(&self) -> Rc<dyn Backend>;
 }
 
 #[cfg(test)]
@@ -34,7 +37,6 @@ pub mod mock {
         }
 
         fn show(&self, s: &impl Show) -> Result<(), front::Error> {
-            eprintln!("show: {}", s.show_str(self));
             Err(front::Error::Other(s.show_str(self)))
         }
 
@@ -52,6 +54,10 @@ pub mod mock {
 
         fn file_system(&self) -> &Self::Fs {
             &MockFs
+        }
+
+        fn backend(&self) -> Rc<dyn Backend> {
+            unimplemented!()
         }
     }
 

@@ -3,6 +3,7 @@ use crate::front;
 use crate::front::data::{Position, Range};
 use std::fmt;
 use std::io::{self, Write};
+use std::path::{Path as StdPath, PathBuf};
 
 pub use self::physical::PhysicalFs;
 #[cfg(test)]
@@ -18,6 +19,32 @@ pub trait FileSystem {
     fn find(&self, pat: SearchPattern) -> Result<Vec<Path>, Error>;
     fn resolve_location(&self, loc: ast::Location) -> Result<front::Locator, Error>;
     fn show_path(&self, path: Path, w: &mut dyn Write) -> Result<(), Error>;
+    fn snippet(&self, range: &Range) -> Result<String, Error>;
+
+    fn get_line(&self, path: Path, line: usize) -> Result<String, Error> {
+        self.with_file(path, |file| {
+            // FIXME could panic
+            file.lines[line].clone()
+        })
+    }
+
+    fn resolve_path(&self, path: &StdPath) -> Result<Path, Error> {
+        let pat: SearchPattern = path.canonicalize()?.display().to_string().into();
+        let paths = self.find(pat)?;
+        match paths.len() {
+            0 => Err(Error::BadLocation(format!(
+                "path not found: {}",
+                path.canonicalize()?.display()
+            ))),
+            1 => Ok(paths.into_iter().next().unwrap()),
+            _ => Err(Error::InternalError(format!(
+                "multiple paths found for {}",
+                path.canonicalize()?.display()
+            ))),
+        }
+    }
+
+    fn physical_path(&self, path: &Path) -> Result<PathBuf, Error>;
 }
 
 #[derive(Clone)]
@@ -146,6 +173,14 @@ mod test {
                 _ => panic!(),
             }?;
             Ok(())
+        }
+
+        fn snippet(&self, range: &Range) -> Result<String, Error> {
+            Ok(format!("snippet at {:?}", range))
+        }
+
+        fn physical_path(&self, path: &Path) -> Result<StdPath, Error> {
+            Err(Error::Other(format!("Path: {:?}", path)))
         }
     }
 
