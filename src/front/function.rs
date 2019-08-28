@@ -120,6 +120,61 @@ impl Function for Select {
     }
 }
 
+pub struct Pick {}
+
+impl Function for Pick {
+    const NAME: &'static str = "pick";
+    const ARITY: Arity = Arity::None;
+
+    fn eval(
+        &self,
+        interpreter: &mut Interpreter<'_, impl Environment>,
+        lhs: Box<ast::Expr>,
+        _: Vec<ast::Expr>,
+    ) -> Result<Value, Error> {
+        let lhs = interpreter.interpret_expr(lhs.kind)?;
+        match &lhs.kind {
+            ValueKind::Query(q) => {
+                let ty = lhs.ty.unquery().expect_set_inner();
+                Ok(Value {
+                    kind: ValueKind::Query(query::Pick::new(lhs.into(), ty.clone())),
+                    ty: Type::Query(Box::new(ty)),
+                })
+            }
+            ValueKind::Set(vs) if vs.is_empty() => Err(Error::EmptySet),
+            ValueKind::Set(vs) => Ok(vs[0].clone()),
+            _ => Err(Error::TypeError(format!(
+                "Expected set, found {:?}",
+                lhs.ty
+            ))),
+        }
+    }
+
+    fn ty(
+        &self,
+        interpreter: &mut Interpreter<'_, impl Environment>,
+        lhs: &ast::Expr,
+        _: &[ast::Expr],
+    ) -> Result<Type, Error> {
+        let lhs_ty = interpreter.type_expr(&lhs.kind)?;
+        let inner = match lhs_ty.unquery() {
+            Type::Set(ty) => *ty,
+            _ => {
+                return Err(Error::TypeError(format!(
+                    "Expected set, found {:?}",
+                    lhs_ty
+                )))
+            }
+        };
+
+        if lhs_ty.is_query() {
+            Ok(Type::Query(Box::new(inner)))
+        } else {
+            Ok(inner)
+        }
+    }
+}
+
 pub struct Idents {}
 
 impl Function for Idents {
@@ -154,5 +209,44 @@ impl Function for Idents {
         }
 
         Ok(Type::Query(Box::new(Type::Set(Box::new(Type::Identifier)))))
+    }
+}
+
+pub struct Definition {}
+
+impl Function for Definition {
+    const NAME: &'static str = "def";
+    const ARITY: Arity = Arity::None;
+
+    fn eval(
+        &self,
+        interpreter: &mut Interpreter<'_, impl Environment>,
+        lhs: Box<ast::Expr>,
+        args: Vec<ast::Expr>,
+    ) -> Result<Value, Error> {
+        let lhs = interpreter.interpret_expr(lhs.kind)?;
+        Ok(Value {
+            kind: ValueKind::Query(query::Definition::new(lhs.clone().into(), lhs.ty.clone())),
+            ty: lhs.ty,
+        })
+    }
+
+    fn ty(
+        &self,
+        interpreter: &mut Interpreter<'_, impl Environment>,
+        lhs: &ast::Expr,
+        _: &[ast::Expr],
+    ) -> Result<Type, Error> {
+        let ty_lhs = interpreter.type_expr(&lhs.kind)?;
+        match ty_lhs.unquery() {
+            Type::Identifier => Ok(Type::Query(Box::new(Type::Definition))),
+            Type::Set(ref inner) if &**inner == &Type::Identifier => {
+                Ok(Type::Query(Box::new(Type::Set(Box::new(Type::Definition)))))
+            }
+            _ => Err(Error::TypeError(format!(
+                "Expected identifier, found {:?}",
+                ty_lhs
+            ))),
+        }
     }
 }

@@ -64,7 +64,6 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
             }
             ast::ExprKind::Apply(a) => self.interpret_apply(a),
             ast::ExprKind::Field(p) => self.interpret_apply(p.into()),
-            _ => unimplemented!(),
         }
     }
 
@@ -75,7 +74,6 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
             ast::ExprKind::Location(_) => Ok(Type::Location),
             ast::ExprKind::Apply(a) => self.type_apply(a),
             ast::ExprKind::Field(p) => self.type_apply(&(*p).clone().into()),
-            _ => unimplemented!(),
         }
     }
 
@@ -94,7 +92,7 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
             }
         };
 
-        interpret!(apply.ident.name, Select, Show, Idents)
+        interpret!(apply.ident.name, Select, Show, Idents, Definition, Pick)
     }
 
     fn type_apply(&mut self, apply: &ast::Apply) -> Result<Type, Error> {
@@ -111,7 +109,7 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
             }
         };
 
-        typ!(apply.ident.name, Select, Show, Idents)
+        typ!(apply.ident.name, Select, Show, Idents, Definition, Pick)
     }
 
     fn lookup_var(&mut self, kind: &ast::MetaVarKind) -> Result<Value, Error> {
@@ -176,6 +174,7 @@ pub enum Error {
     VarNotFound(MetaVar),
     UnknownFunction(String),
     TypeError(String),
+    EmptySet,
     Other(String),
 }
 
@@ -186,6 +185,7 @@ impl fmt::Display for Error {
             Error::VarNotFound(v) => write!(f, "Variable not found: `{}`", v),
             Error::UnknownFunction(s) => write!(f, "Unknown function: `{}`", s),
             Error::TypeError(s) => write!(f, "{}", s),
+            Error::EmptySet => write!(f, "empty set"),
             Error::Other(s) => write!(f, "{}", s),
         }
     }
@@ -239,7 +239,7 @@ mod test {
     fn test_var_lookup() {
         let mut interp = Interpreter::new(&MockEnv);
         assert!(interp
-            .lookup_var(ast::MetaVarKind::Named(builder::ident("foo")))
+            .lookup_var(&ast::MetaVarKind::Named(builder::ident("foo")))
             .is_err());
 
         interp
@@ -247,7 +247,7 @@ mod test {
             .variables
             .insert(MetaVar::new("foo"), Value::void());
         assert!(interp
-            .lookup_var(ast::MetaVarKind::Named(builder::ident("foo")))
+            .lookup_var(&ast::MetaVarKind::Named(builder::ident("foo")))
             .is_ok());
     }
 

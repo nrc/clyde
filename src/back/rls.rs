@@ -1,6 +1,6 @@
 use super::{Backend, Error};
 use crate::file_system::{FileSystem, PhysicalFs};
-use crate::front::data::{Identifier, Position, Range, Span};
+use crate::front::data::{Definition, Identifier, Position, Range, Span};
 
 use rls_analysis::{AnalysisHost, Id, Ident, Span as RlsSpan, Target};
 use rls_span::{Column, Row};
@@ -38,7 +38,7 @@ impl Rls<PhysicalFs> {
 
         let status = cmd.status().expect("Running build failed");
         // FIXME handle an error instead of unwrapping
-        let result = status.code().unwrap();
+        status.code().unwrap();
         // FIXME cleanup analysis (see cargo src)
     }
 }
@@ -55,6 +55,15 @@ impl<Fs: FileSystem> Backend for Rls<Fs> {
     fn idents_in(&self, range: Range) -> Result<Vec<Identifier>, Error> {
         let idents = self.analysis_host.idents(&range.into_with(&*self.fs)?)?;
         idents.into_iter().map(|i| i.into_with(&*self.fs)).collect()
+    }
+
+    fn definition(&self, id: Identifier) -> Result<Definition, Error> {
+        let def = self.analysis_host.get_def(Id::new(id.id))?;
+        Ok(Definition {
+            id: id.id,
+            name: def.name,
+            span: def.span.into_with(&*self.fs)?,
+        })
     }
 }
 

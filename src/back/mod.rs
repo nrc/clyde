@@ -1,17 +1,20 @@
 pub use rls::Rls;
 
 use crate::file_system;
-use crate::front::data::{Identifier, Position, Range};
+use crate::front::data::{Definition, Identifier, Position, Range};
 use std::fmt;
 
 mod rls;
 
 pub trait Backend {
-    fn ident_at(&self, position: Position) -> Result<Option<Identifier>, Error> {
+    fn ident_at(&self, _position: Position) -> Result<Option<Identifier>, Error> {
         Err(Error::NotImplemented("ident_at"))
     }
-    fn idents_in(&self, range: Range) -> Result<Vec<Identifier>, Error> {
+    fn idents_in(&self, _range: Range) -> Result<Vec<Identifier>, Error> {
         Err(Error::NotImplemented("idents_in"))
+    }
+    fn definition(&self, _id: Identifier) -> Result<Definition, Error> {
+        Err(Error::NotImplemented("definition"))
     }
 }
 

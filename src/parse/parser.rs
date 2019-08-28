@@ -96,35 +96,34 @@ impl Parser {
             _ => return Ok(None),
         };
 
-        let expr = ast::Expr {
+        let mut expr = ast::Expr {
             kind,
             ctx: self.ctx.clone(),
         };
 
-        if let Some(tokens::Token {
+        // FIXME should allow mixing `.` and `->`
+        while let Some(tokens::Token {
             kind: tokens::TokenKind::Symbol(tokens::SymbolKind::ArrowRight),
             ..
         }) = &self.peek()
         {
-            return self.apply(Box::new(expr)).map(|a| {
-                Some(ast::Expr {
-                    kind: ast::ExprKind::Apply(a),
-                    ctx: self.ctx.clone(),
-                })
-            });
+            let fun = self.apply(Box::new(expr))?;
+            expr = ast::Expr {
+                kind: ast::ExprKind::Apply(fun),
+                ctx: self.ctx.clone(),
+            };
         }
 
-        if let Some(tokens::Token {
+        while let Some(tokens::Token {
             kind: tokens::TokenKind::Symbol(tokens::SymbolKind::Dot),
             ..
         }) = &self.peek()
         {
-            return self.field(Box::new(expr)).map(|p| {
-                Some(ast::Expr {
-                    kind: ast::ExprKind::Field(p),
-                    ctx: self.ctx.clone(),
-                })
-            });
+            let field = self.field(Box::new(expr))?;
+            expr = ast::Expr {
+                kind: ast::ExprKind::Field(field),
+                ctx: self.ctx.clone(),
+            };
         }
 
         Ok(Some(expr))
@@ -460,5 +459,11 @@ mod test {
             ast::StatementKind::ApplyShorthand(a) if a.ident.name == "foo" => {}
             _ => panic!(),
         }
+    }
+
+    #[test]
+    fn smoke_expr() {
+        let toks = lexer::lex("show (:src/back/mod.rs:10:38).idents.def", 0).unwrap();
+        let _stmt = parser(toks).parse_stmt().unwrap();
     }
 }

@@ -106,6 +106,7 @@ pub enum Type {
     Position,
     Range,
     String,
+    Definition,
 }
 
 impl Type {
@@ -123,6 +124,20 @@ impl Type {
             _ => false,
         }
     }
+
+    pub fn unquery(&self) -> Type {
+        match self {
+            Type::Query(inner) => inner.unquery(),
+            _ => self.clone(),
+        }
+    }
+
+    pub fn expect_set_inner(&self) -> Type {
+        match self {
+            Type::Set(inner) => (**inner).clone(),
+            _ => panic!("unexpected: {:?}", self),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -135,6 +150,7 @@ pub enum ValueKind {
     Query(Query),
     Identifier(Identifier),
     String(String),
+    Definition(Definition),
 }
 
 impl ValueKind {
@@ -174,8 +190,19 @@ impl Show for ValueKind {
             ValueKind::String(s) => write!(w, "\"{}\"", s).map_err(Into::into),
             ValueKind::Identifier(id) => write!(w, "`{}`", id.name).map_err(Into::into),
             ValueKind::Query(_) => write!(w, "<Query>").map_err(Into::into),
+            ValueKind::Definition(def) => {
+                write!(w, "`{}` at ", def.name)?;
+                def.span.show(w, env)
+            }
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Definition {
+    pub id: u64,
+    pub span: Span,
+    pub name: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

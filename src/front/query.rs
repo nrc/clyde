@@ -34,6 +34,35 @@ pub trait Function {
 }
 
 #[derive(Clone)]
+pub struct Pick;
+
+impl Pick {
+    pub fn new(lhs: Query, ty: Type) -> Query {
+        Query::Function(Fun {
+            def: &Pick,
+            ty,
+            lhs: Box::new(lhs),
+            args: vec![],
+        })
+    }
+}
+
+impl Function for Pick {
+    fn eval(&self, f: &Fun, back: &dyn Backend) -> Result<Value, Error> {
+        let lhs = f.lhs.eval(back)?;
+        match lhs.kind {
+            ValueKind::Set(s) => Ok(s[0].clone()),
+            _ => {
+                return Err(Error::TypeError(format!(
+                    "Unexpected runtime type, expected: set, found: {:?}",
+                    lhs.ty
+                )))
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Idents;
 
 impl Idents {
@@ -73,6 +102,41 @@ impl Function for Idents {
                     .collect(),
             ),
             ty: f.ty.clone(),
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct Definition;
+
+impl Definition {
+    pub fn new(lhs: Query, ty: Type) -> Query {
+        Query::Function(Fun {
+            def: &Definition,
+            ty,
+            lhs: Box::new(lhs),
+            args: vec![],
+        })
+    }
+}
+
+impl Function for Definition {
+    fn eval(&self, f: &Fun, back: &dyn Backend) -> Result<Value, Error> {
+        let lhs = f.lhs.eval(back)?;
+        let def = match lhs.kind {
+            ValueKind::Identifier(id) => back.definition(id.clone())?,
+            ValueKind::Set(s) => unimplemented!(),
+            _ => {
+                return Err(Error::TypeError(format!(
+                    "Unexpected runtime type, expected: identifier, found: {:?}",
+                    lhs.ty
+                )))
+            }
+        };
+
+        Ok(Value {
+            kind: ValueKind::Definition(def),
+            ty: Type::Definition,
         })
     }
 }

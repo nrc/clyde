@@ -5,6 +5,12 @@ Intends to facilitate code exploration, sophisticated search and replace, and re
 
 Very work in progress.
 
+## Example
+
+```
+show (:src/back/mod.rs:10:38).idents.pick.def
+```
+
 ## Notes on language
 
 Comments are `#` comments.
@@ -49,8 +55,7 @@ Statements may be terminated with an optional `;`
 * `select`: `query -> set` evaluate a query
 * TODO `eq`: `T, T -> T?` equality
 * TODO `match`: `string:T, regex -> T?` regex matching
-* TODO `find`: `ident -> set<ident>` find all refs
-* TODO `def`: `ident -> def` find definition
+* TODO `find`: `string|regex|def|ident -> set<ident>` find all refs
 * TODO `is`: `item, item-kind -> item?`
 * TODO `items`: `item -> set<item>`
 * TODO `type`: `ident, type -> ident?`
@@ -78,34 +83,37 @@ How to specify?
 * `position: location`
 * `range: location`
 * `set`
-  - `count: n`
+  - TODO `count: n`
   - `pick`
 * `list`
 * `identifier`
-  - `name: string`
-  - `span: range`
-  - `type: type`
+  - TODO `name: string`
+  - TODO `span: range`
+  - TODO `type: type`
+  - `def: def`
 * `def` a chain of definitions
-  - `primary: item`
-  - `list<item>`
+  - TODO `primary: item`
+  - TODO `list<item>`
 * `item`
-  - `kind: def-kind`
-  - `span: range`
-  - `focus: range`
-  - `src: string`
-  - `doc: string`
-  - `sig: string`
+  - TODO `kind: def-kind`
+  - TODO `span: range`
+  - TODO `focus: range`
+  - TODO `src: string`
+  - TODO `doc: string`
+  - TODO `sig: string`
 * `type`
-  - `def: item`
-  - `ident: ident?`
+  - TODO `def: item`
+  - TODO `ident: ident?`
 
 ### Coercions
 
-* `expr` -> `query`
-* `set<T>*1` -> `T`
-* `set<T>*0` <-> `()`
+* TODO `expr` -> `query`
+* TODO `set<T>*1` -> `T`
+* TODO `set<T>*0` <-> `()`
 
 ### Variables
+
+TODO
 
 Named variables can be any alphanumeric name + underscores, must start with a letter
 

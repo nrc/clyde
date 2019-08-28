@@ -179,7 +179,7 @@ mod test {
             Ok(format!("snippet at {:?}", range))
         }
 
-        fn physical_path(&self, path: &Path) -> Result<StdPath, Error> {
+        fn physical_path(&self, path: &Path) -> Result<PathBuf, Error> {
             Err(Error::Other(format!("Path: {:?}", path)))
         }
     }
