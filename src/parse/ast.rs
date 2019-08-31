@@ -3,6 +3,7 @@ use derive_new::new;
 
 pub trait Node {}
 
+#[derive(Clone)]
 pub struct Program {
     pub stmts: Vec<Statement>,
     pub ctx: Context,
@@ -44,7 +45,7 @@ pub enum ExprKind {
     // (:...)
     Location(Location),
     // expr.foo
-    Field(Projection),
+    Projection(Projection),
 }
 
 #[derive(Clone)]
@@ -90,7 +91,7 @@ impl Node for Location {}
 #[derive(Clone)]
 pub enum MetaVarKind {
     Dollar,
-    Numeric(usize),
+    Numeric(isize),
     Named(Identifier),
 }
 

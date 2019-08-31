@@ -76,6 +76,7 @@ impl<'a> Lexer<'a> {
                     Token::new(TokenKind::Symbol(SymbolKind::ArrowRight), self.make_span(2)),
                     2,
                 ))),
+                Some(c) if c.is_numeric() => self.lex_number(),
                 Some(_) => Err(self.make_err("Unexpected token".to_owned(), 1)),
             },
             // A nested token tree, we don't lex this beyond matching delimiters, and
@@ -110,20 +111,22 @@ impl<'a> Lexer<'a> {
     fn lex_number(&self) -> Result<Option<(Token, usize)>, parse::Error> {
         let mut chars = self.input[self.position..].chars();
         let mut number = String::new();
+        let mut negator = 1;
+        let mut len = 0;
         loop {
             match chars.next() {
+                Some('-') => negator *= -1,
                 Some(c) if c.is_numeric() => {
                     number.push(c);
                 }
                 _ => break,
             }
+            len += 1;
         }
+        let number: i64 = self.err_from_parse(number.parse())?;
         Ok(Some((
-            Token::new(
-                TokenKind::Number(self.err_from_parse(number.parse())?),
-                self.make_span(number.len()),
-            ),
-            number.len(),
+            Token::new(TokenKind::Number(number * negator), self.make_span(len)),
+            len,
         )))
     }
 
@@ -334,13 +337,24 @@ mod test {
                 span: Span::new(0, "42".to_owned()),
             }
         );
+        assert_eq!(
+            lex("-42", 0).unwrap(),
+            Token {
+                kind: TokenKind::Tree(TokenTree {
+                    tokens: vec![Token {
+                        kind: TokenKind::Number(-42),
+                        span: Span::new(0, "-42".to_owned())
+                    },]
+                }),
+                span: Span::new(0, "-42".to_owned()),
+            }
+        );
     }
 
     #[test]
     fn errors() {
         // FIXME test error messages and spans
         assert!(lex("%", 0).is_err());
-        assert!(lex("-4", 0).is_err());
         assert!(lex("-", 0).is_err());
         assert!(lex("(foo", 0).is_err());
     }

@@ -68,7 +68,17 @@ impl Parser {
             tokens::TokenKind::Symbol(sym) => match sym {
                 tokens::SymbolKind::Dollar => {
                     self.bump();
-                    ast::ExprKind::MetaVar(ast::MetaVarKind::Dollar)
+                    let mut number = None;
+                    if let Some(tokens::TokenKind::Number(n)) = self.peek().map(|t| &t.kind) {
+                        number = Some(*n as isize);
+                    }
+
+                    if let Some(n) = number {
+                        self.bump();
+                        ast::ExprKind::MetaVar(ast::MetaVarKind::Numeric(n))
+                    } else {
+                        ast::ExprKind::MetaVar(ast::MetaVarKind::Dollar)
+                    }
                 }
                 _ => return Ok(None),
             },
@@ -121,7 +131,7 @@ impl Parser {
         {
             let field = self.field(Box::new(expr))?;
             expr = ast::Expr {
-                kind: ast::ExprKind::Field(field),
+                kind: ast::ExprKind::Projection(field),
                 ctx: self.ctx.clone(),
             };
         }

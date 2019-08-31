@@ -82,7 +82,7 @@ impl Function for Idents {
         let idents = match lhs.kind {
             ValueKind::Position(p) => back.ident_at(p.clone())?.into_iter().collect(),
             ValueKind::Range(r) => back.idents_in(r.clone())?,
-            ValueKind::Set(s) => unimplemented!(),
+            ValueKind::Set(_) => unimplemented!(),
             _ => {
                 return Err(Error::TypeError(format!(
                     "Unexpected runtime type, expected: location, found: {:?}",
@@ -125,7 +125,7 @@ impl Function for Definition {
         let lhs = f.lhs.eval(back)?;
         let def = match lhs.kind {
             ValueKind::Identifier(id) => back.definition(id.clone())?,
-            ValueKind::Set(s) => unimplemented!(),
+            ValueKind::Set(_) => unimplemented!(),
             _ => {
                 return Err(Error::TypeError(format!(
                     "Unexpected runtime type, expected: identifier, found: {:?}",

@@ -45,6 +45,12 @@ impl From<Value> for Query {
     }
 }
 
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "<Value (type: {:?})>", self.ty)
+    }
+}
+
 impl Value {
     pub fn void() -> Value {
         Value {
@@ -136,6 +142,30 @@ impl Type {
         match self {
             Type::Set(inner) => (**inner).clone(),
             _ => panic!("unexpected: {:?}", self),
+        }
+    }
+
+    pub fn element_type(&self) -> Option<&Type> {
+        match self {
+            Type::Set(t) => Some(&t),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Type::Void => write!(f, "void"),
+            Type::Query(t) => write!(f, "query<{}>", t),
+            Type::Number => write!(f, "number"),
+            Type::Set(t) => write!(f, "set<{}>", t),
+            Type::Identifier => write!(f, "identifier"),
+            Type::Location => write!(f, "location"),
+            Type::Position => write!(f, "position"),
+            Type::Range => write!(f, "range"),
+            Type::String => write!(f, "string"),
+            Type::Definition => write!(f, "def"),
         }
     }
 }
@@ -309,8 +339,8 @@ impl Show for Range {
 pub struct Span {
     pub file: Path,
     pub start_line: usize,
-    pub end_line: usize,
     pub start_column: usize,
+    pub end_line: usize,
     pub end_column: usize,
 }
 

@@ -33,17 +33,22 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
         Ok(self.symbols)
     }
 
-    fn interpret_stmt(&mut self, stmt: ast::Statement) -> Result<(), Error> {
+    pub fn interpret_stmt(&mut self, stmt: ast::Statement) -> Result<Value, Error> {
         match stmt.kind {
             ast::StatementKind::Expr(expr) => {
                 let value = self.interpret_expr(expr)?;
-                self.show_result(&value)
+                self.show_result(&value);
+                Ok(value)
             }
-            ast::StatementKind::Meta(mk) => self.env.exec_meta(mk),
             ast::StatementKind::ApplyShorthand(a) => {
                 let value = self.interpret_apply(a)?;
-                self.show_result(&value)
-            } //_ => unimplemented!(),
+                self.show_result(&value);
+                Ok(value)
+            }
+            ast::StatementKind::Meta(mk) => {
+                self.env.exec_meta(mk)?;
+                Ok(Value::void())
+            }
         }
     }
 
@@ -63,7 +68,7 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
                 Ok(loc.into())
             }
             ast::ExprKind::Apply(a) => self.interpret_apply(a),
-            ast::ExprKind::Field(p) => self.interpret_apply(p.into()),
+            ast::ExprKind::Projection(p) => self.interpret_apply(p.into()),
         }
     }
 
@@ -73,7 +78,7 @@ impl<'a, Env: Environment> Interpreter<'a, Env> {
             ast::ExprKind::MetaVar(kind) => self.lookup_var(kind).map(|val| val.ty),
             ast::ExprKind::Location(_) => Ok(Type::Location),
             ast::ExprKind::Apply(a) => self.type_apply(a),
-            ast::ExprKind::Field(p) => self.type_apply(&(*p).clone().into()),
+            ast::ExprKind::Projection(p) => self.type_apply(&(*p).clone().into()),
         }
     }
 
@@ -172,6 +177,7 @@ impl<T: fmt::Display> Show for T {
 pub enum Error {
     IoError(io::Error),
     VarNotFound(MetaVar),
+    NumericVarNotFound(usize, usize),
     UnknownFunction(String),
     TypeError(String),
     EmptySet,
@@ -183,6 +189,11 @@ impl fmt::Display for Error {
         match self {
             Error::IoError(e) => e.fmt(f),
             Error::VarNotFound(v) => write!(f, "Variable not found: `{}`", v),
+            Error::NumericVarNotFound(v, max) => write!(
+                f,
+                "Variable not found: {} (maximum numeric variable: {})",
+                v, max
+            ),
             Error::UnknownFunction(s) => write!(f, "Unknown function: `{}`", s),
             Error::TypeError(s) => write!(f, "{}", s),
             Error::EmptySet => write!(f, "empty set"),
@@ -254,6 +265,7 @@ mod test {
     #[test]
     fn test_meta() {
         let mut interp = Interpreter::new(&MockEnv);
+        // Returns error because the mock env should always return an error.
         assert_err(
             interp.interpret_stmt(builder::meta_stmt(ast::MetaKind::Exit)),
             "exit",

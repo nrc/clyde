@@ -34,7 +34,7 @@ pub trait EnvContext {
     fn clone(&self) -> Box<dyn EnvContext>;
 }
 
-pub fn parse_stmt(s: &str, env_ctx: Option<Box<dyn EnvContext>>) -> Result<ast::Program, Error> {
+pub fn parse_stmt(s: &str, env_ctx: Option<Box<dyn EnvContext>>) -> Result<ast::Statement, Error> {
     let mut ctx = Context::default();
     ctx.input = Some(s.to_owned());
     ctx.env_ctx = env_ctx;
@@ -42,8 +42,5 @@ pub fn parse_stmt(s: &str, env_ctx: Option<Box<dyn EnvContext>>) -> Result<ast::
     if toks.is_empty() {
         return Err(Error::EmptyInput);
     }
-    Ok(ast::Program {
-        stmts: vec![parser::parse_stmt(toks, ctx.clone())?],
-        ctx,
-    })
+    parser::parse_stmt(toks, ctx.clone())
 }

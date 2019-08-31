@@ -24,26 +24,28 @@ Statements may be terminated with an optional `;`
 * TODO Concatenation: `name '+=' expr`
 * Meta-command: `'^' command`
 * TODO in-place function application: `name '<-' name ['(' args ')']`
-* zero-arg function shorthand name [flags] expr
+* zero-arg function shorthand `name [flags] expr`
 
 ### Expressions
 
 * Parens: `(expr)`
 * Locations: `'('':'name[:line[:column]]')'` - name is a string, line and column are unsigned ints
 * function application: `expr '->' name [flags] ['(' args ')']`
-* field projection: `expr '.' name`
-* TODO variables: `name | '$' | '$' n`
+* field projection/sequence indexing: `expr '.' name`
+* TODO(named) variables: `name | '$' | '$' n`
 * TODO path: `'('['::'name]+')'`
 
 ### Commands
 
-* `exit`
-* `help`
-* `fmt`
-* `build`/`check`
-* `type expr` print meta-type info
-* `debug expr` print metadata
-* `clear $n` clear back to line n
+`^cmd flags`
+
+* `exit` (`q`)
+* `help` (`h`)
+* TODO `fmt`
+* TODO `build`/`check`
+* TODO `type expr` print meta-type info
+* TODO `debug expr` print metadata
+* TODO `clear [$n]` clear back to line n (or clear all)
 
 ### Functions
 

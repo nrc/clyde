@@ -134,7 +134,7 @@ impl Function for Pick {
     ) -> Result<Value, Error> {
         let lhs = interpreter.interpret_expr(lhs.kind)?;
         match &lhs.kind {
-            ValueKind::Query(q) => {
+            ValueKind::Query(_) => {
                 let ty = lhs.ty.unquery().expect_set_inner();
                 Ok(Value {
                     kind: ValueKind::Query(query::Pick::new(lhs.into(), ty.clone())),
@@ -222,7 +222,7 @@ impl Function for Definition {
         &self,
         interpreter: &mut Interpreter<'_, impl Environment>,
         lhs: Box<ast::Expr>,
-        args: Vec<ast::Expr>,
+        _: Vec<ast::Expr>,
     ) -> Result<Value, Error> {
         let lhs = interpreter.interpret_expr(lhs.kind)?;
         Ok(Value {

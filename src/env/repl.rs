@@ -1,9 +1,9 @@
 use super::Environment;
 use crate::back;
 use crate::file_system::PhysicalFs;
-use crate::front::{self, Show};
+use crate::front::{self, data, MetaVar, Show};
 use crate::parse::{self, ast};
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::env;
 use std::io::{stdin, stdout, Write};
 use std::path::PathBuf;
@@ -12,9 +12,9 @@ use std::rc::Rc;
 
 pub struct Repl {
     config: Config,
-    line_count: Cell<usize>,
     file_system: Rc<PhysicalFs>,
     rls: RefCell<Option<Rc<back::Rls<PhysicalFs>>>>,
+    prev_results: RefCell<Vec<Option<data::Value>>>,
 }
 
 impl Repl {
@@ -22,8 +22,8 @@ impl Repl {
         Repl {
             file_system: Rc::new(PhysicalFs::new(&config.current_dir)),
             config,
-            line_count: Cell::new(0),
             rls: RefCell::new(None),
+            prev_results: RefCell::new(Vec::new()),
         }
     }
 
@@ -34,15 +34,12 @@ impl Repl {
             let prompt = self.prompt();
             print!("{}", prompt);
             stdout().flush().expect("Couldn't flush stdout");
+
             buf.truncate(0);
             stdin.read_line(&mut buf).expect("Error reading from stdin");
             match parse::parse_stmt(&buf, None) {
                 Ok(node) => {
-                    let interpreter = front::Interpreter::new(self);
-                    if let Err(e) = interpreter.interpret(node) {
-                        println!("{}", e);
-                    }
-                    self.incr_line_count();
+                    let result = self.interpret(node);
                 }
                 Err(e) => match e {
                     parse::Error::EmptyInput => {}
@@ -50,11 +47,11 @@ impl Repl {
                         let offset = offset + prompt.len();
                         println!("{}^", " ".repeat(offset));
                         println!("{}", msg);
-                        self.incr_line_count();
+                        self.prev_results.borrow_mut().push(None);
                     }
                     parse::Error::Parsing(msg) => {
                         println!("{}", msg);
-                        self.incr_line_count();
+                        self.prev_results.borrow_mut().push(None);
                     }
                     parse::Error::Other(msg) => println!("Error parsing input: {}", msg),
                 },
@@ -62,13 +59,21 @@ impl Repl {
         }
     }
 
-    fn prompt(&self) -> String {
-        format!("{} > ", self.line_count.get())
+    fn interpret(&self, stmt: ast::Statement) -> Result<front::Value, front::Error> {
+        let mut interpreter = front::Interpreter::new(self);
+        let result = interpreter.interpret_stmt(stmt.clone());
+        match &result {
+            Ok(v) => self.prev_results.borrow_mut().push(Some(v.clone())),
+            Err(e) => {
+                println!("Error: {}", e);
+                self.prev_results.borrow_mut().push(None);
+            }
+        }
+        result
     }
 
-    fn incr_line_count(&self) {
-        let line_count = self.line_count.get();
-        self.line_count.set(line_count + 1);
+    fn prompt(&self) -> String {
+        format!("{} > ", self.prev_results.borrow().len())
     }
 }
 
@@ -105,9 +110,26 @@ impl Environment for Repl {
         // TODO lookup variable by name
         Err(front::Error::VarNotFound(var.clone()))
     }
-    fn lookup_numeric_var(&self, id: isize) -> Result<front::Value, front::Error> {
-        // TODO
-        unimplemented!();
+
+    fn lookup_numeric_var(&self, mut id: isize) -> Result<front::Value, front::Error> {
+        let prev_result = {
+            let prev_results = self.prev_results.borrow();
+            if id < 0 {
+                id = prev_results.len() as isize + id;
+            }
+            if id < 0 || id as usize >= prev_results.len() {
+                return Err(front::Error::NumericVarNotFound(
+                    id as usize,
+                    prev_results.len().saturating_sub(1),
+                ));
+            }
+            prev_results[id as usize].clone()
+        };
+        if let Some(result) = prev_result {
+            Ok(result)
+        } else {
+            Err(front::Error::VarNotFound(MetaVar::new(&id.to_string())))
+        }
     }
 
     fn file_system(&self) -> &PhysicalFs {
